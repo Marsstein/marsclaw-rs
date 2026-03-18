@@ -28,22 +28,24 @@ marsclaw chat    # start chatting
 marsclaw serve   # launch web dashboard
 ```
 
-## Why Rust?
+## Why MarsClaw?
 
-Every other AI agent framework runs on Python or TypeScript. They need 200MB of dependencies, 2 seconds to cold start, and 80MB of RAM just to sit idle.
+Every AI coding agent today ships as a Python package, an Electron app, or a Docker container. We asked: what if an agent was just a single binary?
 
-MarsClaw is different.
+| | **MarsClaw** | Claude Code | Aider | Goose | Cursor | OpenHands |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Language** | **Rust** | TypeScript | Python | Python | Electron | Python |
+| **Install size** | **5 MB** | ~200 MB | ~150 MB | ~120 MB | ~400 MB | ~2 GB |
+| **Memory (idle)** | **~3 MB** | ~150 MB | ~120 MB | ~100 MB | ~500 MB | ~1 GB |
+| **Cold start** | **<10ms** | ~3s | ~2s | ~2s | ~5s | ~10s |
+| **Runtime deps** | **0** | Node.js | Python + pip | Python + pip | Chromium | Docker |
+| **Single binary** | **Yes** | No | No | No | No | No |
+| **Multi-agent** | **Yes** | No | No | Yes | No | Yes |
+| **Self-hosted** | **Yes** | No | Yes | Yes | No | Yes |
+| **Chat channels** | **5** | 0 | 0 | 0 | 0 | 0 |
+| **MCP client** | **Yes** | Yes | No | Yes | No | No |
 
-| | **MarsClaw** (Rust) | Go agents | Python agents |
-|---|:---:|:---:|:---:|
-| **Binary size** | **5 MB** | 18 MB | 200+ MB |
-| **Memory (idle)** | **~3 MB** RSS | ~15 MB | ~80 MB |
-| **Cold start** | **<10ms** | ~50ms | ~2s |
-| **Runtime deps** | **0** | 0 | 50+ packages |
-| **Type safety** | **Compile-time** | Runtime | Runtime |
-| **Single binary** | **Yes** | Yes | No |
-
-One `curl` or `cargo install`. That's it. No Docker, no venv, no node_modules.
+One `cargo install`. That's it. No Docker, no venv, no node_modules, no Electron.
 
 ## Features
 
@@ -233,17 +235,6 @@ scheduler:
 ```
 
 Environment variables override config: `MARSCLAW_PROVIDER=ollama`, `MARSCLAW_MODEL=llama3.1`, etc.
-
-## Comparison
-
-| Framework | Language | Binary/Install | Cold Start | Memory | Agents |
-|-----------|----------|----------------|------------|--------|--------|
-| **MarsClaw** | **Rust** | **5 MB binary** | **<10ms** | **3 MB** | **Multi-agent** |
-| Claude Code | TypeScript | npm install | ~3s | ~150 MB | Single |
-| Aider | Python | pip install | ~2s | ~120 MB | Single |
-| Goose | Python | pip install | ~2s | ~100 MB | Multi |
-| Cursor Agent | Electron | 300+ MB app | ~5s | ~500 MB | Single |
-| OpenHands | Python | Docker | ~10s | ~2 GB | Multi |
 
 ## Contributing
 
