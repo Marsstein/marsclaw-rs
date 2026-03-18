@@ -1,18 +1,24 @@
 mod agent;
 mod channels;
 mod config;
+mod discord;
+mod hooks;
 mod llm;
 mod mcp;
+mod memory;
 mod orchestration;
 mod scheduler;
 mod security;
 mod server;
 mod setup;
 mod skills;
+mod slack;
 mod store;
+mod telegram;
 mod terminal;
 mod tool;
 mod types;
+mod whatsapp;
 
 use std::sync::Arc;
 
@@ -66,6 +72,30 @@ enum Commands {
     Skills {
         #[command(subcommand)]
         action: SkillAction,
+    },
+    /// Run Telegram bot
+    Telegram {
+        /// Channel ID from channels.json
+        #[arg(long)]
+        channel: Option<String>,
+    },
+    /// Run Discord bot
+    Discord {
+        /// Channel ID from channels.json
+        #[arg(long)]
+        channel: Option<String>,
+    },
+    /// Run Slack bot
+    Slack {
+        /// Channel ID from channels.json
+        #[arg(long)]
+        channel: Option<String>,
+    },
+    /// Run WhatsApp webhook bot (mounted on serve)
+    WhatsApp {
+        /// Channel ID from channels.json
+        #[arg(long)]
+        channel: Option<String>,
     },
     /// Interactive setup wizard
     Init,
@@ -135,6 +165,18 @@ async fn main() -> anyhow::Result<()> {
 
     // Dispatch subcommand.
     match cli.command {
+        Some(Commands::Telegram { channel }) => {
+            run_telegram(&cfg, channel.as_deref()).await
+        }
+        Some(Commands::Discord { channel }) => {
+            run_discord(&cfg, channel.as_deref()).await
+        }
+        Some(Commands::Slack { channel }) => {
+            run_slack(&cfg, channel.as_deref()).await
+        }
+        Some(Commands::WhatsApp { channel }) => {
+            run_whatsapp(&cfg, channel.as_deref()).await
+        }
         Some(Commands::Init) => {
             setup::run_wizard()?;
             Ok(())
@@ -273,11 +315,14 @@ async fn run_single_prompt(cfg: &config::Config, prompt: &str) -> anyhow::Result
 // ---------------------------------------------------------------------------
 
 async fn run_serve(cfg: &config::Config, addr: &str) -> anyhow::Result<()> {
+    let provider = create_provider(cfg)?;
     let model = cfg.model().to_string();
     let cwd = std::env::current_dir()
         .unwrap_or_default()
         .to_string_lossy()
         .to_string();
+    let registry = tool::Registry::default_registry(&cwd);
+    let cost = create_cost_tracker(cfg);
 
     let (soul, _) = agent::discovery::discover_project_prompts(&cwd);
     let soul = skills::get_active_prompt().unwrap_or(if soul.is_empty() {
@@ -287,6 +332,30 @@ async fn run_serve(cfg: &config::Config, addr: &str) -> anyhow::Result<()> {
     });
 
     let db: Arc<dyn store::Store> = Arc::new(store::SqliteStore::new()?);
+
+    // Mount WhatsApp webhook if configured.
+    let extra = if let Some(ref wa_cfg) = cfg.whatsapp {
+        if !wa_cfg.phone_number_id.is_empty() {
+            let bot = Arc::new(whatsapp::WhatsAppBot::new(
+                &wa_cfg.phone_number_id,
+                &wa_cfg.access_token,
+                &wa_cfg.verify_token,
+                provider.clone(),
+                cfg.agent.clone(),
+                registry.clone(),
+                cost.clone(),
+                db.clone(),
+                &soul,
+                &model,
+            ));
+            tracing::info!("whatsapp webhook mounted at /webhook/whatsapp");
+            Some(bot.router())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
     // Build task info for dashboard.
     let tasks: Vec<server::TaskInfo> = cfg
@@ -313,7 +382,295 @@ async fn run_serve(cfg: &config::Config, addr: &str) -> anyhow::Result<()> {
         "\x1b[1m\x1b[36mMarsClaw server running at http://localhost{addr}\x1b[0m"
     );
 
-    server::run(server_config, db).await
+    server::run(server_config, db, extra).await
+}
+
+// ---------------------------------------------------------------------------
+// Telegram bot
+// ---------------------------------------------------------------------------
+
+async fn run_telegram(cfg: &config::Config, channel_id: Option<&str>) -> anyhow::Result<()> {
+    // Resolve token: env var > channels.json > error.
+    let token = resolve_telegram_token(channel_id)?;
+
+    let provider = create_provider(cfg)?;
+    let cwd = std::env::current_dir()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    let registry = tool::Registry::default_registry(&cwd);
+    let cost = create_cost_tracker(cfg);
+    let model = cfg.model().to_string();
+
+    let (soul, _) = agent::discovery::discover_project_prompts(&cwd);
+    let soul = skills::get_active_prompt().unwrap_or(if soul.is_empty() {
+        DEFAULT_SOUL.to_string()
+    } else {
+        soul
+    });
+
+    let db: Arc<dyn store::Store> = Arc::new(store::SqliteStore::new()?);
+
+    let bot = telegram::TelegramBot::new(
+        &token, provider, cfg.agent.clone(), registry, cost, db, &soul, &model,
+    );
+
+    bot.run().await
+}
+
+fn resolve_telegram_token(channel_id: Option<&str>) -> anyhow::Result<String> {
+    // 1. Environment variable takes priority.
+    if let Ok(token) = std::env::var("TELEGRAM_BOT_TOKEN") {
+        if !token.is_empty() {
+            return Ok(token);
+        }
+    }
+
+    // 2. Look up from channels.json.
+    let store = channels::ChannelStore::new();
+    let channels = store.list().unwrap_or_default();
+
+    let tg_channels: Vec<_> = channels
+        .iter()
+        .filter(|c| c.provider == "telegram")
+        .collect();
+
+    let channel = match channel_id {
+        Some(id) => tg_channels.iter().find(|c| c.id == id).copied(),
+        None => tg_channels.first().copied(),
+    };
+
+    if let Some(ch) = channel {
+        if let Some(ref token) = ch.token {
+            if !token.is_empty() {
+                return Ok(token.clone());
+            }
+        }
+    }
+
+    anyhow::bail!(
+        "No Telegram bot token found.\n\
+         Set TELEGRAM_BOT_TOKEN env var or run: marsclaw channels add"
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Discord bot
+// ---------------------------------------------------------------------------
+
+async fn run_discord(cfg: &config::Config, channel_id: Option<&str>) -> anyhow::Result<()> {
+    let token = resolve_discord_token(channel_id)?;
+
+    let provider = create_provider(cfg)?;
+    let cwd = std::env::current_dir()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    let registry = tool::Registry::default_registry(&cwd);
+    let cost = create_cost_tracker(cfg);
+
+    let (soul, _) = agent::discovery::discover_project_prompts(&cwd);
+    let soul = skills::get_active_prompt().unwrap_or(if soul.is_empty() {
+        DEFAULT_SOUL.to_string()
+    } else {
+        soul
+    });
+
+    let db: Arc<dyn store::Store> = Arc::new(store::SqliteStore::new()?);
+
+    let bot = discord::DiscordBot::new(discord::DiscordBotConfig {
+        token,
+        provider,
+        agent_cfg: cfg.agent.clone(),
+        registry,
+        safety: None,
+        cost,
+        store: db,
+        soul,
+    });
+
+    let cancel = CancellationToken::new();
+    let cancel_clone = cancel.clone();
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c().await.ok();
+        cancel_clone.cancel();
+    });
+
+    bot.run(cancel).await
+}
+
+fn resolve_discord_token(channel_id: Option<&str>) -> anyhow::Result<String> {
+    if let Ok(token) = std::env::var("DISCORD_BOT_TOKEN") {
+        if !token.is_empty() {
+            return Ok(token);
+        }
+    }
+
+    let ch_store = channels::ChannelStore::new();
+    let all_channels = ch_store.list().unwrap_or_default();
+
+    let dc_channels: Vec<_> = all_channels
+        .iter()
+        .filter(|c| c.provider == "discord")
+        .collect();
+
+    let channel = match channel_id {
+        Some(id) => dc_channels.iter().find(|c| c.id == id).copied(),
+        None => dc_channels.first().copied(),
+    };
+
+    if let Some(ch) = channel {
+        if let Some(ref token) = ch.token {
+            if !token.is_empty() {
+                return Ok(token.clone());
+            }
+        }
+    }
+
+    anyhow::bail!(
+        "No Discord bot token found.\n\
+         Set DISCORD_BOT_TOKEN env var or run: marsclaw channels add"
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Slack bot
+// ---------------------------------------------------------------------------
+
+async fn run_slack(cfg: &config::Config, channel_id: Option<&str>) -> anyhow::Result<()> {
+    let (bot_token, app_token) = resolve_slack_tokens(channel_id)?;
+
+    let provider = create_provider(cfg)?;
+    let cwd = std::env::current_dir()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    let registry = tool::Registry::default_registry(&cwd);
+    let cost = create_cost_tracker(cfg);
+
+    let (soul, _) = agent::discovery::discover_project_prompts(&cwd);
+    let soul = skills::get_active_prompt().unwrap_or(if soul.is_empty() {
+        DEFAULT_SOUL.to_string()
+    } else {
+        soul
+    });
+
+    let db: Arc<dyn store::Store> = Arc::new(store::SqliteStore::new()?);
+
+    let bot = slack::SlackBot::new(slack::SlackBotConfig {
+        bot_token,
+        app_token,
+        provider,
+        agent_cfg: cfg.agent.clone(),
+        registry,
+        safety: None,
+        cost,
+        store: db,
+        soul,
+    });
+
+    let cancel = CancellationToken::new();
+    let cancel_clone = cancel.clone();
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c().await.ok();
+        cancel_clone.cancel();
+    });
+
+    bot.run(cancel).await
+}
+
+fn resolve_slack_tokens(channel_id: Option<&str>) -> anyhow::Result<(String, String)> {
+    let bot_token_env = std::env::var("SLACK_BOT_TOKEN").unwrap_or_default();
+    let app_token_env = std::env::var("SLACK_APP_TOKEN").unwrap_or_default();
+
+    if !bot_token_env.is_empty() && !app_token_env.is_empty() {
+        return Ok((bot_token_env, app_token_env));
+    }
+
+    let ch_store = channels::ChannelStore::new();
+    let all_channels = ch_store.list().unwrap_or_default();
+
+    let sl_channels: Vec<_> = all_channels
+        .iter()
+        .filter(|c| c.provider == "slack")
+        .collect();
+
+    let channel = match channel_id {
+        Some(id) => sl_channels.iter().find(|c| c.id == id).copied(),
+        None => sl_channels.first().copied(),
+    };
+
+    if let Some(ch) = channel {
+        let bt = if bot_token_env.is_empty() {
+            ch.bot_token.clone().unwrap_or_default()
+        } else {
+            bot_token_env
+        };
+        let at = if app_token_env.is_empty() {
+            ch.app_token.clone().unwrap_or_default()
+        } else {
+            app_token_env
+        };
+
+        if !bt.is_empty() && !at.is_empty() {
+            return Ok((bt, at));
+        }
+    }
+
+    anyhow::bail!(
+        "No Slack tokens found.\n\
+         Set SLACK_BOT_TOKEN and SLACK_APP_TOKEN env vars, or run: marsclaw channels add"
+    )
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp bot (runs as serve sub-mount or standalone)
+// ---------------------------------------------------------------------------
+
+async fn run_whatsapp(cfg: &config::Config, _channel_id: Option<&str>) -> anyhow::Result<()> {
+    let wa_cfg = cfg
+        .whatsapp
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("No WhatsApp config found. Add [whatsapp] section to config.yaml"))?;
+
+    let provider = create_provider(cfg)?;
+    let cwd = std::env::current_dir()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    let registry = tool::Registry::default_registry(&cwd);
+    let cost = create_cost_tracker(cfg);
+    let model = cfg.model().to_string();
+
+    let (soul, _) = agent::discovery::discover_project_prompts(&cwd);
+    let soul = skills::get_active_prompt().unwrap_or(if soul.is_empty() {
+        DEFAULT_SOUL.to_string()
+    } else {
+        soul
+    });
+
+    let db: Arc<dyn store::Store> = Arc::new(store::SqliteStore::new()?);
+
+    let bot = Arc::new(whatsapp::WhatsAppBot::new(
+        &wa_cfg.phone_number_id,
+        &wa_cfg.access_token,
+        &wa_cfg.verify_token,
+        provider,
+        cfg.agent.clone(),
+        registry,
+        cost,
+        db,
+        &soul,
+        &model,
+    ));
+
+    let app = bot.router();
+    let addr = normalize_addr(":8080");
+    eprintln!("\x1b[1m\x1b[36mWhatsApp webhook listening at http://localhost{}\x1b[0m", &addr);
+
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    axum::serve(listener, app).await?;
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -329,11 +686,8 @@ fn create_provider(cfg: &config::Config) -> anyhow::Result<Arc<dyn Provider>> {
                     cfg.providers.anthropic.api_key_env
                 )
             })?;
-            // Route through OpenAI-compatible endpoint is not available for Anthropic.
-            // For now, we use the OpenAI provider as a placeholder.
-            Ok(Arc::new(llm::openai::OpenAiProvider::new(
+            Ok(Arc::new(llm::anthropic::AnthropicProvider::new(
                 &key,
-                "https://api.anthropic.com/v1",
                 &cfg.providers.anthropic.default_model,
             )))
         }
@@ -359,7 +713,10 @@ fn create_provider(cfg: &config::Config) -> anyhow::Result<Arc<dyn Provider>> {
         "ollama" => Ok(Arc::new(llm::openai::OpenAiProvider::ollama(
             &cfg.providers.ollama.default_model,
         ))),
-        other => anyhow::bail!("Unknown provider: {other}"),
+        "" => anyhow::bail!(
+            "No provider configured. Run `marsclaw init` to set up your LLM provider."
+        ),
+        other => anyhow::bail!("Unknown provider: {other}. Run `marsclaw init` to configure."),
     }
 }
 

@@ -15,6 +15,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Holds available tools and their executors.
+#[derive(Clone)]
 pub struct Registry {
     defs: Vec<ToolDef>,
     executors: HashMap<String, Arc<dyn ToolExecutor>>,

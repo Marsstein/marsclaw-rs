@@ -208,6 +208,22 @@ pub struct RunResult {
     pub history: Vec<Message>,
 }
 
+impl Default for RunResult {
+    fn default() -> Self {
+        Self {
+            response: String::new(),
+            stop_reason: StopReason::FinalResponse,
+            turn_count: 0,
+            total_input: 0,
+            total_output: 0,
+            duration: std::time::Duration::ZERO,
+            error: None,
+            trace: Vec::new(),
+            history: Vec::new(),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Context assembly
 // ---------------------------------------------------------------------------

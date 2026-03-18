@@ -16,6 +16,20 @@ pub struct Config {
     pub mcp: Vec<McpServerConfig>,
     #[serde(default)]
     pub scheduler: SchedulerConfig,
+    #[serde(default)]
+    pub whatsapp: Option<WhatsAppConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppConfig {
+    pub phone_number_id: String,
+    pub access_token: String,
+    #[serde(default = "default_wa_verify")]
+    pub verify_token: String,
+}
+
+fn default_wa_verify() -> String {
+    "marsclaw_verify".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -151,7 +165,7 @@ pub struct TaskConfig {
 // --- Default value functions ---
 
 fn default_provider() -> String {
-    "gemini".into()
+    String::new() // no default — user picks during `marsclaw init`
 }
 fn default_anthropic_env() -> String {
     "ANTHROPIC_API_KEY".into()
@@ -231,6 +245,7 @@ impl Default for Config {
             security: SecurityConfig::default(),
             mcp: Vec::new(),
             scheduler: SchedulerConfig::default(),
+            whatsapp: None,
         }
     }
 }
@@ -457,7 +472,7 @@ impl Config {
             "openai" => &self.providers.openai.default_model,
             "gemini" => &self.providers.gemini.default_model,
             "ollama" => &self.providers.ollama.default_model,
-            _ => "gemini-2.5-flash",
+            _ => "not-configured",
         }
     }
 
@@ -500,7 +515,7 @@ mod tests {
     #[test]
     fn defaults_are_sane() {
         let cfg = Config::default();
-        assert_eq!(cfg.providers.default, "gemini");
+        assert!(cfg.providers.default.is_empty(), "no default — user picks during init");
         assert_eq!(cfg.agent.max_turns, 25);
         assert_eq!(cfg.agent.max_input_tokens, 180_000);
         assert_eq!(cfg.agent.max_output_tokens, 16_384);
@@ -516,7 +531,7 @@ mod tests {
     #[test]
     fn model_returns_active_provider_model() {
         let cfg = Config::default();
-        assert_eq!(cfg.model(), "gemini-2.5-flash");
+        assert_eq!(cfg.model(), "not-configured"); // no default provider
 
         let mut cfg = Config::default();
         cfg.providers.default = "anthropic".into();
@@ -560,7 +575,7 @@ mod tests {
     fn deserialize_empty_yaml() {
         let yaml = "{}";
         let cfg: Config = serde_yaml::from_str(yaml).unwrap();
-        assert_eq!(cfg.providers.default, "gemini");
+        assert!(cfg.providers.default.is_empty());
         assert_eq!(cfg.agent.max_turns, 25);
     }
 
@@ -596,7 +611,7 @@ agent:
     fn load_missing_file_returns_defaults() {
         unsafe { std::env::remove_var("MARSCLAW_PROVIDER") };
         let cfg = Config::load(Some("/tmp/nonexistent-marsclaw-config.yaml")).unwrap();
-        assert_eq!(cfg.providers.default, "gemini");
+        assert!(cfg.providers.default.is_empty(), "no default provider — user picks during init");
         assert_eq!(cfg.agent.max_turns, 25);
     }
 

@@ -245,11 +245,15 @@ async fn handle_delete_channel(Path(id): Path<String>) -> Response {
 // Server entry point
 // ---------------------------------------------------------------------------
 
-pub async fn run(config: ServerConfig, store: Arc<dyn Store>) -> anyhow::Result<()> {
+pub async fn run(
+    config: ServerConfig,
+    store: Arc<dyn Store>,
+    extra: Option<Router>,
+) -> anyhow::Result<()> {
     let addr = config.addr.clone();
     let state = Arc::new(AppState { store, config });
 
-    let app = Router::new()
+    let mut app = Router::new()
         .route("/", get(handle_ui))
         .route("/app", get(handle_ui))
         .route("/api/sessions", post(handle_create_session))
@@ -262,6 +266,10 @@ pub async fn run(config: ServerConfig, store: Arc<dyn Store>) -> anyhow::Result<
         .route("/api/channels", get(handle_list_channels))
         .route("/api/channels/{id}", delete(handle_delete_channel))
         .with_state(state);
+
+    if let Some(extra) = extra {
+        app = app.merge(extra);
+    }
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!("server listening on {}", addr);

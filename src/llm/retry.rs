@@ -10,6 +10,7 @@ pub fn is_retryable(err: &anyhow::Error) -> bool {
     let msg = err.to_string();
     msg.contains("429")
         || msg.contains("503")
+        || msg.contains("529")
         || msg.contains("rate limit")
         || msg.contains("overloaded")
         || msg.contains("timeout")
