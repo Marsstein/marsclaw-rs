@@ -1,12 +1,736 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MarsClaw</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MarsClaw</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23ff4444'/></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0f;--surface:#111118;--surface2:#1a1a24;--border:#252530;
+  --text:#ededf0;--dim:#8090a8;--accent:#ff4444;--accent2:#ff6b35;
+  --green:#4ade80;--blue:#60a5fa;--yellow:#fbbf24;--red:#f85149;--purple:#a78bfa;
+  --gradient:linear-gradient(135deg,#ff4444,#ff6b35);
+  --radius:10px;--sidebar-w:280px;
+}
+html{height:100%}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100%;display:flex;-webkit-font-smoothing:antialiased;font-size:14px}
+a{color:var(--accent);text-decoration:none}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Sidebar */
+.sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;height:100%}
+.sidebar-brand{padding:20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+.sidebar-brand svg{width:28px;height:28px}
+.sidebar-brand h1{font-size:16px;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sidebar-brand .version{font-size:11px;color:var(--dim);margin-left:auto;background:var(--surface2);padding:2px 8px;border-radius:4px}
+
+/* Nav sections */
+.nav-section{padding:8px 12px 4px;font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;margin-top:8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;margin:2px 8px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--dim);transition:all 0.15s;font-weight:500}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:rgba(255,68,68,0.08);color:var(--accent)}
+.nav-item svg{width:18px;height:18px;flex-shrink:0}
+.nav-item .badge{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;min-width:18px;text-align:center}
+.nav-item .dot{margin-left:auto;width:6px;height:6px;border-radius:50%;background:var(--green)}
+
+/* Session list in sidebar */
+.session-section{flex:1;overflow-y:auto;padding:4px 0;border-top:1px solid var(--border);margin-top:8px}
+.session-item{display:flex;align-items:center;gap:8px;padding:8px 16px;margin:1px 8px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:all 0.15s}
+.session-item:hover{background:var(--surface2);color:var(--text)}
+.session-item.active{background:rgba(255,68,68,0.06);color:var(--text)}
+.session-item .del{margin-left:auto;opacity:0;color:var(--red);cursor:pointer;padding:2px 4px;font-size:16px;line-height:1}
+.session-item:hover .del{opacity:0.6}
+.session-item .del:hover{opacity:1}
+.new-chat-btn{display:flex;align-items:center;justify-content:center;gap:6px;margin:8px 12px;padding:9px;border-radius:8px;border:1px dashed var(--border);color:var(--dim);cursor:pointer;font-size:13px;font-weight:500;transition:all 0.15s}
+.new-chat-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(255,68,68,0.04)}
+
+/* Sidebar footer */
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0}
+.sidebar-footer span{font-size:12px;color:var(--dim)}
+
+/* Main content */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%}
+
+/* Page header */
+.page-header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0}
+.page-header h2{font-size:16px;font-weight:600}
+.page-header .model-badge{margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);padding:4px 12px;border-radius:6px;font-size:12px;color:var(--dim)}
+.page-header .model-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+
+/* Chat view */
+.messages{flex:1;overflow-y:auto;padding:24px}
+.msg{max-width:760px;width:100%;margin:0 auto 16px;line-height:1.7;font-size:14px}
+.msg.user{background:var(--surface);border:1px solid var(--border);padding:14px 18px;border-radius:var(--radius);border-bottom-right-radius:4px}
+.msg.assistant{padding:4px 18px}
+.msg.assistant pre{background:var(--surface);border:1px solid var(--border);padding:14px;border-radius:8px;overflow-x:auto;font-size:13px;margin:10px 0;font-family:'JetBrains Mono','SF Mono',monospace}
+.msg.assistant code{font-size:13px;background:var(--surface2);padding:2px 7px;border-radius:4px;font-family:'JetBrains Mono','SF Mono',monospace}
+.msg.assistant pre code{background:none;padding:0}
+.tool-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.15);color:var(--yellow);padding:3px 10px;border-radius:6px;font-size:12px;font-weight:500;margin:3px 4px 3px 0;font-family:'JetBrains Mono',monospace}
+.cost-line{text-align:center;color:var(--dim);font-size:12px;padding:8px;font-family:'JetBrains Mono',monospace;border-top:1px solid var(--border);margin-top:8px}
+
+/* Input area */
+.input-area{border-top:1px solid var(--border);padding:16px 24px;flex-shrink:0;background:var(--bg)}
+.input-wrap{max-width:760px;margin:0 auto;display:flex;gap:10px;align-items:flex-end}
+#prompt{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:14px 18px;border-radius:var(--radius);font-size:14px;resize:none;font-family:inherit;min-height:48px;max-height:200px;line-height:1.5;transition:border-color 0.2s}
+#prompt:focus{outline:none;border-color:rgba(255,68,68,0.4)}
+#prompt::placeholder{color:var(--dim)}
+#send{background:var(--gradient);color:#fff;border:none;padding:14px 22px;border-radius:var(--radius);cursor:pointer;font-size:14px;font-weight:600;transition:all 0.2s;min-height:48px}
+#send:hover{opacity:0.9;transform:translateY(-1px);box-shadow:0 4px 16px rgba(255,68,68,0.2)}
+#send:disabled{opacity:.3;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* Empty state */
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--dim)}
+.empty-state svg{width:48px;height:48px;color:var(--border);margin-bottom:8px}
+.empty-state h3{font-size:18px;font-weight:600;color:var(--text)}
+.empty-state p{font-size:14px;max-width:400px;text-align:center;line-height:1.6}
+.quick-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;justify-content:center}
+.quick-action{padding:8px 16px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--dim);cursor:pointer;transition:all 0.15s}
+.quick-action:hover{border-color:var(--accent);color:var(--accent);background:rgba(255,68,68,0.04)}
+
+/* Dashboard page */
+.dashboard{padding:24px;overflow-y:auto;flex:1}
+.dashboard h2{font-size:20px;font-weight:700;margin-bottom:20px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.stat-card .label{font-size:12px;color:var(--dim);font-weight:500;text-transform:uppercase;letter-spacing:0.03em}
+.stat-card .value{font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+.stat-card .value.gradient{background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-card .sub{font-size:12px;color:var(--dim);margin-top:4px}
+
+/* Activity feed */
+.activity{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.activity-header{padding:16px 20px;border-bottom:1px solid var(--border);font-weight:600;font-size:14px}
+.activity-item{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:13px}
+.activity-item:last-child{border-bottom:none}
+.activity-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.activity-icon.chat{background:rgba(96,165,250,0.1);color:var(--blue)}
+.activity-icon.tool{background:rgba(251,191,36,0.1);color:var(--yellow)}
+.activity-icon.schedule{background:rgba(74,222,128,0.1);color:var(--green)}
+.activity-icon.error{background:rgba(248,81,73,0.1);color:var(--red)}
+.activity-text{flex:1;color:var(--dim)}
+.activity-text strong{color:var(--text);font-weight:500}
+.activity-time{color:var(--dim);font-size:12px;flex-shrink:0}
+
+/* Scheduler page */
+.scheduler{padding:24px;overflow-y:auto;flex:1}
+.task-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:12px;display:flex;align-items:center;gap:16px}
+.task-status{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.task-status.active{background:var(--green)}
+.task-status.idle{background:var(--dim)}
+.task-info{flex:1}
+.task-name{font-weight:600;font-size:14px;margin-bottom:2px}
+.task-schedule{font-size:12px;color:var(--dim);font-family:'JetBrains Mono',monospace}
+.task-next{font-size:12px;color:var(--dim)}
+
+/* Settings page */
+.settings{padding:24px;overflow-y:auto;flex:1}
+.setting-group{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden}
+.setting-group-title{padding:14px 20px;border-bottom:1px solid var(--border);font-weight:600;font-size:14px}
+.setting-row{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:13px}
+.setting-row:last-child{border-bottom:none}
+.setting-label{flex:1;font-weight:500}
+.setting-value{color:var(--dim);font-family:'JetBrains Mono',monospace;font-size:12px}
+
+/* Page views - show/hide */
+.page{display:none;flex-direction:column;height:100%}
+.page.active{display:flex}
+
+/* Mobile */
+@media(max-width:768px){
+  .sidebar{position:fixed;left:-280px;z-index:100;height:100%;transition:left 0.3s}
+  .sidebar.open{left:0}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .mobile-menu{display:block !important}
+}
+.mobile-menu{display:none;padding:8px;cursor:pointer;background:none;border:none;color:var(--text)}
+
+/* Channel cards */
+.channel-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;display:flex;align-items:center;gap:16px;transition:border-color 0.2s}
+.channel-card:hover{border-color:rgba(255,68,68,0.2)}
+.channel-card.connected{border-color:rgba(74,222,128,0.2)}
+.channel-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.channel-icon.telegram{background:rgba(0,136,204,0.1);color:#0088cc}
+.channel-icon.discord{background:rgba(88,101,242,0.1);color:#5865F2}
+.channel-icon.slack{background:rgba(74,21,75,0.1);color:#E01E5A}
+.channel-icon.whatsapp{background:rgba(37,211,102,0.1);color:#25D366}
+.channel-icon.instagram{background:rgba(228,64,95,0.1);color:#E4405F}
+.channel-icon.webui{background:rgba(255,68,68,0.1);color:var(--accent)}
+.channel-info{flex:1}
+.channel-name{font-weight:600;font-size:14px;margin-bottom:2px}
+.channel-status{font-size:12px;color:var(--dim)}
+.channel-status.online{color:var(--green)}
+.channel-badge{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600}
+.channel-badge.connected{background:rgba(74,222,128,0.1);color:var(--green)}
+.channel-badge.available{background:var(--surface2);color:var(--dim)}
+
+/* Typing indicator */
+.typing-indicator{display:flex;gap:4px;padding:8px 18px}
+.typing-indicator span{width:6px;height:6px;border-radius:50%;background:var(--dim);animation:typingBounce 1.4s infinite}
+.typing-indicator span:nth-child(2){animation-delay:0.2s}
+.typing-indicator span:nth-child(3){animation-delay:0.4s}
+@keyframes typingBounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+</style>
 </head>
 <body>
+
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="12" fill="url(#g)"/><defs><linearGradient id="g" x1="0" y1="0" x2="28" y2="28"><stop stop-color="#ff4444"/><stop offset="1" stop-color="#ff6b35"/></linearGradient></defs></svg>
     <h1>MarsClaw</h1>
-    <p>AI Agent Runtime</p>
+    <span class="version">v0.1</span>
+  </div>
+
+  <div class="nav-section">Main</div>
+  <div class="nav-item active" data-page="chat" onclick="showPage('chat')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    Chat
+  </div>
+  <div class="nav-item" data-page="dashboard" onclick="showPage('dashboard')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    Overview
+  </div>
+
+  <div class="nav-section">Control</div>
+  <div class="nav-item" data-page="channels" onclick="showPage('channels')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    Channels
+  </div>
+  <div class="nav-item" data-page="scheduler" onclick="showPage('scheduler')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    Scheduler
+    <span class="dot"></span>
+  </div>
+
+  <div class="nav-section">Settings</div>
+  <div class="nav-item" data-page="settings" onclick="showPage('settings')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Settings
+  </div>
+
+  <div class="nav-section">Sessions</div>
+  <div class="new-chat-btn" onclick="createSession()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    New chat
+  </div>
+  <div class="session-section" id="sessions"></div>
+
+  <div class="sidebar-footer">
+    <span class="status-dot"></span>
+    <span>Connected</span>
+  </div>
+</div>
+
+<div class="main">
+  <button class="mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('open')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+
+  <!-- Chat Page -->
+  <div class="page active" id="page-chat">
+    <div class="page-header">
+      <h2>Chat</h2>
+      <div class="model-badge"><span class="dot"></span><span id="model-name">ready</span></div>
+    </div>
+    <div class="messages" id="messages">
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <h3>What can I help with?</h3>
+        <p>MarsClaw can read files, run commands, search code, and automate tasks. Try one of these:</p>
+        <div class="quick-actions">
+          <div class="quick-action" onclick="sendQuick('What files are in this directory?')">List files</div>
+          <div class="quick-action" onclick="sendQuick('What is my system info?')">System info</div>
+          <div class="quick-action" onclick="sendQuick('Check git status')">Git status</div>
+        </div>
+      </div>
+    </div>
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea id="prompt" rows="1" placeholder="Message MarsClaw..." autofocus></textarea>
+        <button id="send">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Page -->
+  <div class="page" id="page-dashboard">
+    <div class="page-header"><h2>Overview</h2></div>
+    <div class="dashboard">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="label">Sessions</div><div class="value gradient" id="stat-sessions">0</div><div class="sub">Total conversations</div></div>
+        <div class="stat-card"><div class="label">Messages</div><div class="value" id="stat-messages">0</div><div class="sub">All time</div></div>
+        <div class="stat-card"><div class="label">Uptime</div><div class="value" id="stat-uptime" style="color:var(--green)">—</div><div class="sub">Since last restart</div></div>
+        <div class="stat-card"><div class="label">Status</div><div class="value" style="color:var(--green)">Active</div><div class="sub">All systems operational</div></div>
+      </div>
+
+      <div class="activity">
+        <div class="activity-header">Recent Activity</div>
+        <div id="activity-feed">
+          <div class="activity-item"><div class="activity-icon tool">🔧</div><div class="activity-text"><strong>MarsClaw</strong> — server running</div><div class="activity-time">now</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Channels Page -->
+  <div class="page" id="page-channels">
+    <div class="page-header">
+      <h2>Channels</h2>
+      <div class="model-badge" style="cursor:pointer" onclick="window.open('https://marsclaw.dev','_blank')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Docs
+      </div>
+    </div>
+    <div class="dashboard" id="channels-content">
+      <p style="color:var(--dim);margin-bottom:20px">Connect MarsClaw to messaging platforms. Add channels via CLI or configure here.</p>
+
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px" id="channel-cards">
+        <!-- Filled by JS -->
+      </div>
+
+      <div class="activity">
+        <div class="activity-header">How to add channels</div>
+        <div class="activity-item">
+          <div class="activity-icon" style="background:rgba(96,165,250,0.1);color:var(--blue);font-size:16px;font-weight:700">1</div>
+          <div class="activity-text">Run <code style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">marsclaw channels add</code> in your terminal</div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-icon" style="background:rgba(96,165,250,0.1);color:var(--blue);font-size:16px;font-weight:700">2</div>
+          <div class="activity-text">Select a provider (Telegram, Discord, Slack, WhatsApp)</div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-icon" style="background:rgba(96,165,250,0.1);color:var(--blue);font-size:16px;font-weight:700">3</div>
+          <div class="activity-text">Paste your bot token — MarsClaw saves it securely to <code style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">~/.marsclaw/channels.json</code></div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-icon" style="background:rgba(74,222,128,0.1);color:var(--green);font-size:16px;font-weight:700">4</div>
+          <div class="activity-text">Run <code style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">marsclaw telegram</code> or <code style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">marsclaw serve</code> to go live</div>
+        </div>
+      </div>
+
+      <div class="activity" style="margin-top:16px">
+        <div class="activity-header">MCP Integrations</div>
+        <div class="activity-item">
+          <div class="activity-icon" style="background:rgba(167,139,250,0.1);color:var(--purple)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </div>
+          <div class="activity-text"><strong>Zapier MCP</strong> — Connect 8,000+ apps (Gmail, Sheets, Slack, Asana...)</div>
+          <div class="activity-time" style="font-family:'JetBrains Mono',monospace;font-size:11px">config.yaml</div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-icon" style="background:rgba(167,139,250,0.1);color:var(--purple)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="18" y2="12"/></svg>
+          </div>
+          <div class="activity-text"><strong>Filesystem MCP</strong> — Read/write files with safety guards</div>
+          <div class="activity-time" style="font-family:'JetBrains Mono',monospace;font-size:11px">built-in</div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-icon" style="background:rgba(255,99,71,0.1);color:#FF6347">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          </div>
+          <div class="activity-text"><strong>n8n MCP</strong> — Workflow automation, 400+ integrations, self-hosted</div>
+          <div class="activity-time" style="font-family:'JetBrains Mono',monospace;font-size:11px">config.yaml</div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-icon" style="background:rgba(167,139,250,0.1);color:var(--purple)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20"/></svg>
+          </div>
+          <div class="activity-text"><strong>Custom MCP</strong> — Any stdio-based MCP server via config</div>
+          <div class="activity-time" style="font-family:'JetBrains Mono',monospace;font-size:11px">config.yaml</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scheduler Page -->
+  <div class="page" id="page-scheduler">
+    <div class="page-header"><h2>Scheduler</h2></div>
+    <div class="scheduler" id="scheduler-content">
+      <p style="color:var(--dim);margin-bottom:16px">Loading tasks...</p>
+    </div>
+  </div>
+
+  <!-- Settings Page -->
+  <div class="page" id="page-settings">
+    <div class="page-header"><h2>Settings</h2></div>
+    <div class="settings">
+      <div class="setting-group">
+        <div class="setting-group-title">Provider</div>
+        <div class="setting-row"><span class="setting-label">Default provider</span><span class="setting-value" id="setting-provider">—</span></div>
+        <div class="setting-row"><span class="setting-label">Model</span><span class="setting-value" id="setting-model">—</span></div>
+        <div class="setting-row"><span class="setting-label">API key</span><span class="setting-value">configured</span></div>
+      </div>
+      <div class="setting-group">
+        <div class="setting-group-title">Agent</div>
+        <div class="setting-row"><span class="setting-label">Max turns</span><span class="setting-value">25</span></div>
+        <div class="setting-row"><span class="setting-label">Streaming</span><span class="setting-value" style="color:var(--green)">enabled</span></div>
+        <div class="setting-row"><span class="setting-label">SOUL.md</span><span class="setting-value" style="color:var(--green)">loaded</span></div>
+      </div>
+      <div class="setting-group">
+        <div class="setting-group-title">Security</div>
+        <div class="setting-row"><span class="setting-label">Strict approval</span><span class="setting-value" style="color:var(--green)">on</span></div>
+        <div class="setting-row"><span class="setting-label">Credential scan</span><span class="setting-value" style="color:var(--green)">on</span></div>
+        <div class="setting-row"><span class="setting-label">Path guard</span><span class="setting-value" style="color:var(--green)">on</span></div>
+      </div>
+      <div class="setting-group">
+        <div class="setting-group-title">Adapters</div>
+        <div class="setting-row"><span class="setting-label">Web UI</span><span class="setting-value" style="color:var(--green)">:8080</span></div>
+        <div class="setting-row"><span class="setting-label">Telegram</span><span class="setting-value">run: marsclaw channels add</span></div>
+        <div class="setting-row"><span class="setting-label">Discord</span><span class="setting-value">run: marsclaw channels add</span></div>
+        <div class="setting-row"><span class="setting-label">Slack</span><span class="setting-value">run: marsclaw channels add</span></div>
+        <div class="setting-row"><span class="setting-label">WhatsApp</span><span class="setting-value">run: marsclaw channels add</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+let currentSession = null;
+let sending = false;
+const startTime = Date.now();
+
+const $sessions = document.getElementById('sessions');
+const $messages = document.getElementById('messages');
+const $prompt = document.getElementById('prompt');
+const $send = document.getElementById('send');
+
+// Provider SVG icons
+const providerIcons = {
+  telegram: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>',
+  discord: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M20.317 4.3698a19.7913 19.7913 0 0 0-4.8851-1.5152.0741.0741 0 0 0-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 0 0-.0785-.037 19.7363 19.7363 0 0 0-4.8852 1.515.0699.0699 0 0 0-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 0 0 .0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 0 0 .0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 0 0-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 0 1-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 0 1 .0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 0 1 .0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 0 1-.0066.1276 12.2986 12.2986 0 0 1-1.873.8914.0766.0766 0 0 0-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 0 0 .0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 0 0 .0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 0 0-.0312-.0286z"/></svg>',
+  slack: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zm10.122 2.521a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zm-1.268 0a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zm-2.523 10.122a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zm0-1.268a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg>',
+  whatsapp: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>',
+  instagram: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 1 0 0-12.324zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405a1.441 1.441 0 1 1-2.88 0 1.441 1.441 0 0 1 2.88 0z"/></svg>',
+};
+
+// Page navigation
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelector(`[data-page="${page}"]`).classList.add('active');
+  if (page === 'dashboard') updateDashboard();
+  if (page === 'channels') loadChannels();
+  if (page === 'scheduler') loadTasks();
+  if (page === 'chat') $prompt.focus();
+}
+
+// Dashboard
+async function updateDashboard() {
+  try {
+    const res = await fetch(`${API}/sessions`);
+    const sessions = await res.json();
+    document.getElementById('stat-sessions').textContent = sessions.length;
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const h = Math.floor(elapsed / 3600);
+    const m = Math.floor((elapsed % 3600) / 60);
+    document.getElementById('stat-uptime').textContent = h > 0 ? `${h}h ${m}m` : `${m}m`;
+  } catch {}
+}
+
+// Auto-resize textarea
+$prompt.addEventListener('input', () => {
+  $prompt.style.height = 'auto';
+  $prompt.style.height = Math.min($prompt.scrollHeight, 200) + 'px';
+});
+$prompt.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+$send.addEventListener('click', sendMessage);
+
+function sendQuick(text) {
+  $prompt.value = text;
+  sendMessage();
+}
+
+async function createSession() {
+  const res = await fetch(`${API}/sessions`, { method: 'POST' });
+  const sess = await res.json();
+  currentSession = sess.id;
+  loadSessions();
+  $messages.innerHTML = `<div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    <h3>What can I help with?</h3>
+    <p>MarsClaw can read files, run commands, search code, and automate tasks.</p>
+    <div class="quick-actions">
+      <div class="quick-action" onclick="sendQuick('What files are in this directory?')">List files</div>
+      <div class="quick-action" onclick="sendQuick('What is my system info?')">System info</div>
+      <div class="quick-action" onclick="sendQuick('Check git status')">Git status</div>
+    </div>
+  </div>`;
+  showPage('chat');
+  $prompt.focus();
+}
+
+async function loadSessions() {
+  const res = await fetch(`${API}/sessions`);
+  const sessions = await res.json();
+  $sessions.innerHTML = '';
+  for (const s of sessions) {
+    const div = document.createElement('div');
+    div.className = 'session-item' + (s.id === currentSession ? ' active' : '');
+    div.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis">${esc(s.title || 'New conversation')}</span>
+      <span class="del" title="Delete">&times;</span>`;
+    div.querySelector('span').addEventListener('click', () => loadSession(s.id));
+    div.querySelector('.del').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await fetch(`${API}/sessions/${s.id}`, { method: 'DELETE' });
+      if (currentSession === s.id) { currentSession = null; }
+      loadSessions();
+    });
+    $sessions.appendChild(div);
+  }
+}
+
+async function loadSession(id) {
+  currentSession = id;
+  showPage('chat');
+  loadSessions();
+  const res = await fetch(`${API}/sessions/${id}`);
+  const data = await res.json();
+  renderMessages(data.messages || []);
+}
+
+function renderMessages(msgs) {
+  $messages.innerHTML = '';
+  for (const m of msgs) {
+    if (m.role === 'system') continue;
+    if (m.role === 'tool') {
+      const div = document.createElement('div');
+      div.className = 'msg assistant';
+      div.innerHTML = `<span class="tool-badge">${esc(m.tool_result?.call_id || 'tool')}</span>`;
+      $messages.appendChild(div);
+      continue;
+    }
+    appendMsg(m.role, m.content || '', m.tool_calls);
+  }
+  scrollBottom();
+}
+
+function appendMsg(role, content, toolCalls) {
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  if (role === 'assistant') {
+    div.innerHTML = formatMarkdown(content);
+    if (toolCalls) {
+      for (const tc of toolCalls) {
+        div.innerHTML = `<span class="tool-badge">⚡ ${esc(tc.name)}</span>` + div.innerHTML;
+      }
+    }
+  } else {
+    div.textContent = content;
+  }
+  const empty = $messages.querySelector('.empty-state');
+  if (empty) empty.remove();
+  $messages.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+async function sendMessage() {
+  const text = $prompt.value.trim();
+  if (!text || sending) return;
+  if (!currentSession) await createSession();
+
+  sending = true;
+  $send.disabled = true;
+  $prompt.value = '';
+  $prompt.style.height = 'auto';
+
+  appendMsg('user', text);
+  const assistantDiv = appendMsg('assistant', '');
+
+  // Show typing indicator
+  assistantDiv.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+
+  try {
+    const res = await fetch(`${API}/sessions/${currentSession}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullText = '';
+    let firstChunk = true;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6);
+        if (data === '[DONE]') continue;
+
+        try {
+          const ev = JSON.parse(data);
+          if (ev.type === 'text') {
+            if (firstChunk) { assistantDiv.innerHTML = ''; firstChunk = false; }
+            fullText += ev.delta;
+            assistantDiv.innerHTML = formatMarkdown(fullText);
+            scrollBottom();
+          } else if (ev.type === 'tool_start' && ev.tool_call) {
+            if (firstChunk) { assistantDiv.innerHTML = ''; firstChunk = false; }
+            const badge = document.createElement('span');
+            badge.className = 'tool-badge';
+            badge.textContent = '⚡ ' + ev.tool_call.name;
+            assistantDiv.prepend(badge);
+          } else if (ev.cost) {
+            const costDiv = document.createElement('div');
+            costDiv.className = 'cost-line';
+            costDiv.textContent = ev.cost;
+            $messages.appendChild(costDiv);
+          }
+        } catch {}
+      }
+    }
+  } catch (err) {
+    assistantDiv.innerHTML = `<span style="color:var(--red)">Error: ${esc(err.message)}</span>`;
+  }
+
+  sending = false;
+  $send.disabled = false;
+  $prompt.focus();
+  loadSessions();
+}
+
+function formatMarkdown(text) {
+  if (!text) return '';
+  return esc(text)
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function scrollBottom() { $messages.scrollTop = $messages.scrollHeight; }
+
+// Channels
+async function loadChannels() {
+  const grid = document.getElementById('channel-cards');
+  if (!grid) return;
+
+  // Always show Web UI as connected
+  let html = `<div class="channel-card connected">
+    <div class="channel-icon webui"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+    <div class="channel-info"><div class="channel-name">Web UI</div><div class="channel-status online">Running on :8080</div></div>
+    <span class="channel-badge connected">Connected</span>
+  </div>`;
+
+  try {
+    const res = await fetch(`${API}/channels`);
+    const data = await res.json();
+    const configured = data.channels || [];
+    const providers = data.providers || [];
+
+    // Show configured channels
+    for (const ch of configured) {
+      const icon = providerIcons[ch.provider] || '';
+      html += `<div class="channel-card connected">
+        <div class="channel-icon ${ch.provider}">${icon}</div>
+        <div class="channel-info"><div class="channel-name">${esc(ch.name)}</div><div class="channel-status online">${esc(ch.provider)} &middot; ${ch.enabled ? 'enabled' : 'disabled'}</div></div>
+        <span class="channel-badge connected">Connected</span>
+      </div>`;
+    }
+
+    // Show unconfigured providers
+    const configuredProviders = new Set(configured.map(c => c.provider));
+    for (const p of providers) {
+      if (configuredProviders.has(p.id)) continue;
+      const icon = providerIcons[p.id] || '';
+      html += `<div class="channel-card">
+        <div class="channel-icon ${p.id}">${icon}</div>
+        <div class="channel-info"><div class="channel-name">${esc(p.name)}</div><div class="channel-status">${esc(p.method)} &middot; not configured</div></div>
+        <span class="channel-badge available">Available</span>
+      </div>`;
+    }
+  } catch {
+    // Show all providers as available if API fails
+    const names = [
+      {id:'telegram', name:'Telegram', method:'Bot API'},
+      {id:'discord', name:'Discord', method:'Bot API'},
+      {id:'slack', name:'Slack', method:'Socket Mode'},
+      {id:'whatsapp', name:'WhatsApp', method:'Cloud API'},
+      {id:'instagram', name:'Instagram', method:'Messenger API'},
+    ];
+    for (const p of names) {
+      const icon = providerIcons[p.id] || '';
+      html += `<div class="channel-card">
+        <div class="channel-icon ${p.id}">${icon}</div>
+        <div class="channel-info"><div class="channel-name">${esc(p.name)}</div><div class="channel-status">${esc(p.method)} &middot; not configured</div></div>
+        <span class="channel-badge available">Available</span>
+      </div>`;
+    }
+  }
+
+  grid.innerHTML = html;
+}
+
+// Scheduler
+async function loadTasks() {
+  const container = document.getElementById('scheduler-content');
+  if (!container) return;
+
+  try {
+    const res = await fetch(`${API}/scheduler/tasks`);
+    const tasks = await res.json();
+
+    if (!tasks || tasks.length === 0) {
+      container.innerHTML = `<div style="text-align:center;padding:48px 24px;color:var(--dim)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="margin-bottom:16px;color:var(--border)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <h3 style="color:var(--text);font-size:16px;margin-bottom:8px">No scheduled tasks</h3>
+        <p style="font-size:13px;max-width:400px;margin:0 auto">Add tasks to your <code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">config.yaml</code> under the <code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">scheduler.tasks</code> section.</p>
+      </div>`;
+      return;
+    }
+
+    let html = '';
+    for (const task of tasks) {
+      const statusClass = task.enabled ? 'active' : 'idle';
+      html += `<div class="task-card">
+        <div class="task-status ${statusClass}"></div>
+        <div class="task-info">
+          <div class="task-name">${esc(task.name || task.id)}</div>
+          <div class="task-schedule">${esc(task.schedule)}</div>
+        </div>
+        <div class="task-next" style="font-size:12px;color:var(--dim)">${task.channel ? esc(task.channel) : 'log'}</div>
+      </div>`;
+    }
+    container.innerHTML = html;
+  } catch {
+    container.innerHTML = '<p style="color:var(--dim)">Failed to load tasks.</p>';
+  }
+}
+
+// Load config
+async function loadConfig() {
+  try {
+    const res = await fetch(`${API}/config`);
+    const cfg = await res.json();
+    const el = document.getElementById('model-name');
+    if (el && cfg.model) el.textContent = cfg.model;
+    const sp = document.getElementById('setting-provider');
+    const sm = document.getElementById('setting-model');
+    if (sp && cfg.model) sp.textContent = cfg.model.split('-')[0];
+    if (sm && cfg.model) sm.textContent = cfg.model;
+  } catch {}
+}
+
+// Init
+loadConfig();
+loadSessions();
+</script>
 </body>
 </html>
