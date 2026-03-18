@@ -12,58 +12,133 @@
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> &middot;
-  <a href="#why-rust">Why Rust?</a> &middot;
+  <a href="#comparison">Comparison</a> &middot;
   <a href="#features">Features</a> &middot;
   <a href="#architecture">Architecture</a> &middot;
-  <a href="#configuration">Configuration</a> &middot;
-  <a href="#comparison">Comparison</a>
+  <a href="#configuration">Configuration</a>
 </p>
 
 ---
 
-```bash
-cargo install marsclaw
-marsclaw init    # interactive setup wizard
-marsclaw chat    # start chatting
-marsclaw serve   # launch web dashboard
+**5MB binary · ~3MB RAM · <10ms cold start · Zero CVEs · Zero dependencies**
+
+MarsClaw is a multi-agent AI runtime written in Rust. It connects to Claude, GPT, Gemini, and local models to help you code, automate tasks, and orchestrate multi-agent workflows — all from a single binary with no dependencies.
+
+```
+$ marsclaw "add error handling to main.rs"
+
+> read_file
+✓ read_file
+> edit_file
+✓ edit_file
+
+Added error wrapping with anyhow to all three return paths in main().
+
+── claude-sonnet-4 │ 1.2K in / 523 out │ $0.012 session ──
 ```
 
-## Why MarsClaw?
+## Quick Start
 
-Every AI coding agent today ships as a Python package, an Electron app, or a Docker container. We asked: what if an agent was just a single binary?
+```bash
+# Install
+cargo install marsclaw
 
-| | **MarsClaw** | Claude Code | Aider | Goose | Cursor | OpenHands |
+# Or download a binary
+curl -sSfL https://marsclaw.dev/install.sh | sh
+
+# Set your API key (pick one)
+export ANTHROPIC_API_KEY="sk-ant-..."   # Anthropic
+export GEMINI_API_KEY="..."             # Google Gemini
+export OPENAI_API_KEY="sk-..."          # OpenAI
+# Or use Ollama for free, fully offline — no key needed
+
+# Interactive mode
+marsclaw
+
+# Single prompt
+marsclaw chat "explain this codebase"
+
+# Use with different providers
+marsclaw -m claude-sonnet-4-20250514 "review this PR"
+marsclaw -m gemini-2.5-flash "explain this code"
+marsclaw -m gpt-4o "write tests for auth.rs"
+marsclaw -m llama3.1 "refactor this function"    # Ollama, free
+
+# Web UI
+marsclaw serve --addr :8080
+
+# Chat bots
+marsclaw telegram        # Telegram bot
+marsclaw discord         # Discord bot
+marsclaw slack           # Slack bot
+
+# Setup wizard
+marsclaw init
+```
+
+## Comparison
+
+|  | Claude Code | Aider | Goose | Cursor | OpenHands | **MarsClaw** |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Language** | **Rust** | TypeScript | Python | Python | Electron | Python |
-| **Install size** | **5 MB** | ~200 MB | ~150 MB | ~120 MB | ~400 MB | ~2 GB |
-| **Memory (idle)** | **~3 MB** | ~150 MB | ~120 MB | ~100 MB | ~500 MB | ~1 GB |
-| **Cold start** | **<10ms** | ~3s | ~2s | ~2s | ~5s | ~10s |
-| **Runtime deps** | **0** | Node.js | Python + pip | Python + pip | Chromium | Docker |
-| **Single binary** | **Yes** | No | No | No | No | No |
-| **Multi-agent** | **Yes** | No | No | Yes | No | Yes |
-| **Self-hosted** | **Yes** | No | Yes | Yes | No | Yes |
-| **Chat channels** | **5** | 0 | 0 | 0 | 0 | 0 |
-| **MCP client** | **Yes** | Yes | No | Yes | No | No |
-
-One `cargo install`. That's it. No Docker, no venv, no node_modules, no Electron.
+| **Language** | TypeScript | Python | Python | Electron | Python | **Rust** |
+| **Install size** | ~200 MB | ~150 MB | ~120 MB | ~400 MB | ~2 GB | **5 MB** |
+| **Memory (idle)** | ~150 MB | ~120 MB | ~100 MB | ~500 MB | ~1 GB | **~3 MB** |
+| **Cold start** | ~3s | ~2s | ~2s | ~5s | ~10s | **<10ms** |
+| **Runtime deps** | Node.js | Python + pip | Python + pip | Chromium | Docker | **0** |
+| **Single binary** | No | No | No | No | No | **Yes** |
+| **Known CVEs** | Inherits npm | Inherits pip | Inherits pip | Chromium | Docker | **0** |
+| | | | | | | |
+| **LLM providers** | Anthropic | 20+ | 10+ | 5+ | 10+ | **4 native + any OpenAI-compatible** |
+| **Anthropic (native API)** | Yes | Yes | Yes | Yes | Yes | **Yes** |
+| **OpenAI** | No | Yes | Yes | Yes | Yes | **Yes** |
+| **Gemini** | No | Yes | Yes | No | Yes | **Yes** |
+| **Ollama (fully offline)** | No | Yes | Yes | No | Yes | **Yes** |
+| **Any OpenAI-compatible** | No | Yes | Yes | No | Yes | **Yes (Groq, Together, DeepSeek, vLLM, LM Studio)** |
+| | | | | | | |
+| **Multi-agent orchestration** | No | No | Partial | No | Yes | **4 patterns** |
+| **Pipeline (sequential)** | No | No | No | No | Yes | **Yes** |
+| **Parallel (fan-out)** | No | No | No | No | No | **Yes** |
+| **Debate (adversarial)** | No | No | No | No | No | **Yes** |
+| **Supervisor (coordinator)** | No | No | Yes | No | Yes | **Yes** |
+| **Sub-agent delegation** | No | No | No | No | No | **Yes** |
+| | | | | | | |
+| **Chat channels** | 0 | 0 | 0 | 0 | 0 | **5** |
+| **Telegram bot** | No | No | No | No | No | **Yes** |
+| **Discord bot** | No | No | No | No | No | **Yes** |
+| **Slack bot** | No | No | No | No | No | **Yes** |
+| **WhatsApp bot** | No | No | No | No | No | **Yes** |
+| **Instagram** | No | No | No | No | No | **Yes** |
+| | | | | | | |
+| **Web dashboard** | No | No | No | Yes | Yes | **Built-in (embedded)** |
+| **MCP client** | Yes | No | Yes | No | No | **Yes (JSON-RPC 2.0)** |
+| **Persistent memory** | No | No | No | No | No | **Yes (episodic/semantic/procedural)** |
+| **Skills / prompt packs** | No | No | No | No | No | **5 built-in + installable** |
+| **Scheduled tasks** | No | No | No | No | No | **Cron + intervals** |
+| **Cost tracking** | Yes | Yes | No | No | No | **Yes (daily/monthly budgets)** |
+| **Credential scanning** | No | No | No | No | No | **Yes** |
+| **Tool approval workflow** | Yes | No | No | No | No | **Yes (per danger level)** |
+| **Session persistence** | No | Yes | No | No | Yes | **SQLite** |
+| **Hook system** | No | No | No | No | No | **Yes (lifecycle events)** |
+| **Offline mode** | No | Yes | Yes | No | No | **Yes (Ollama)** |
+| **Self-hosted** | No | Yes | Yes | No | Yes | **Yes** |
+| **Open source** | No | Yes | Yes | No | Yes | **Yes (Apache-2.0)** |
 
 ## Features
 
 ### LLM Providers
-Connect to any major LLM provider out of the box:
-- **Anthropic** — Claude 4, Sonnet, Haiku (native Messages API)
+Connect to any major LLM provider — switch with a single flag:
+- **Anthropic** — Claude Opus, Sonnet, Haiku (native Messages API with streaming)
 - **OpenAI** — GPT-4o, GPT-4, o1 (+ any OpenAI-compatible endpoint)
 - **Google Gemini** — Gemini 2.5 Flash, Pro
-- **Ollama** — Llama 3, Mistral, CodeLlama, any local model
+- **Ollama** — Llama 3, Mistral, CodeLlama, any local model (free, fully offline)
 - **Any OpenAI-compatible API** — Groq, Together, DeepSeek, Azure, vLLM, LM Studio
 
-### Agent Core
-- **Autonomous agent loop** — tool calling with automatic retry and error recovery
-- **Token budgeting** — system 25%, history 65%, output 10% with smart truncation
-- **SSE streaming** — real-time token streaming over HTTP and terminal
-- **Multi-agent orchestration** — pipeline, parallel, debate, and supervisor patterns
-- **Sub-agent delegation** — agents that spawn and coordinate child agents
-- **Cost tracking** — per-model pricing, daily/monthly budgets, inline display
+### Multi-Agent Orchestration
+Four built-in patterns for complex workflows:
+- **Pipeline** — chain agents sequentially, output of one feeds the next
+- **Parallel** — fan-out tasks to multiple agents, aggregate results
+- **Debate** — adversarial multi-round discussion between agents with a judge
+- **Supervisor** — coordinator agent delegates subtasks to specialist agents
 
 ### Built-in Tools (7)
 | Tool | Description |
@@ -78,55 +153,23 @@ Connect to any major LLM provider out of the box:
 
 ### Channel Integrations (5)
 Deploy your agent to any messaging platform:
-- **Telegram** — long-polling bot with /start, /clear, /help
+- **Telegram** — long-polling bot with /start, /clear, /help commands
 - **Discord** — Gateway WebSocket with real-time messaging
 - **Slack** — Socket Mode with event-driven responses
-- **WhatsApp** — Cloud API webhook (mounts on serve)
+- **WhatsApp** — Cloud API webhook (auto-mounts on serve)
 - **Instagram** — Messenger API integration
 
-### Platform Features
-- **Web dashboard** — embedded single-page UI, zero frontend build
-- **Skills system** — installable prompt packs (coder, devops, writer, analyst, compliance)
-- **Scheduler** — cron-based task automation
-- **MCP support** — JSON-RPC 2.0 client for Zapier, n8n, filesystem, custom servers
-- **Persistent memory** — episodic, semantic, procedural memory with SQLite
-- **Hook system** — lifecycle events (before/after tool calls, LLM calls, errors)
-- **Security** — credential scanning, path traversal guards, tool approval workflow
-- **SQLite persistence** — conversation history with zero config
-- **YAML + env config** — `MARSCLAW_*` env vars override everything
-
-## Quick Start
-
-```bash
-# Install from crates.io
-cargo install marsclaw
-
-# Or build from source (produces 5MB binary)
-git clone https://github.com/Marsstein/marsclaw-rs.git
-cd marsclaw-rs && cargo build --release
-
-# Interactive setup — pick your provider, connect channels
-marsclaw init
-
-# Chat interactively
-marsclaw chat
-
-# Single prompt
-marsclaw chat "explain this codebase and suggest improvements"
-
-# Web dashboard
-marsclaw serve --addr :8080
-
-# Connect messaging channels
-marsclaw channels add      # interactive setup
-marsclaw telegram           # run Telegram bot
-marsclaw discord            # run Discord bot
-marsclaw slack              # run Slack bot
-
-# Manage skills
-marsclaw skills list
-marsclaw skills use coder
-```
+### Platform
+- **Web dashboard** — embedded single-page UI, zero frontend build needed
+- **Skills system** — 5 built-in prompt packs (coder, devops, writer, analyst, compliance) + installable
+- **Scheduler** — cron expressions and interval-based task automation
+- **MCP support** — JSON-RPC 2.0 client for Zapier, n8n, filesystem, custom MCP servers
+- **Persistent memory** — episodic, semantic, and procedural memory backed by SQLite
+- **Hook system** — before/after tool calls, LLM calls, and error events
+- **Security** — credential scanning, path traversal guards, per-danger-level tool approval
+- **Cost tracking** — per-model pricing with daily and monthly budget limits
+- **SQLite persistence** — conversation history and sessions with zero config
+- **Config** — YAML file + `MARSCLAW_*` env var overrides
 
 ## CLI Reference
 
@@ -197,6 +240,9 @@ providers:
   gemini:
     api_key_env: GEMINI_API_KEY
     default_model: gemini-2.5-flash
+  openai:
+    api_key_env: OPENAI_API_KEY
+    default_model: gpt-4o
   ollama:
     default_model: llama3.1
 
@@ -207,6 +253,7 @@ agent:
 
 cost:
   daily_budget: 10.0
+  monthly_budget: 100.0
 
 security:
   scan_credentials: true
@@ -218,7 +265,7 @@ mcp:
     command: npx
     args: ["-y", "@anthropic/mcp-n8n", "--webhook-url", "http://localhost:5678"]
 
-# WhatsApp webhook (mounted on serve)
+# WhatsApp webhook (auto-mounts on serve)
 whatsapp:
   phone_number_id: "123456789"
   access_token: "EAAx..."
