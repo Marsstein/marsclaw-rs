@@ -1,0 +1,59 @@
+[package]
+name = "marsclaw"
+version = "0.1.0"
+edition = "2024"
+description = "The fastest AI agent runtime. Written in Rust."
+license = "Apache-2.0"
+repository = "https://github.com/marsstein/marsclaw"
+keywords = ["ai", "agent", "llm", "runtime", "cli"]
+categories = ["command-line-utilities", "web-programming"]
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# HTTP client + server
+reqwest = { version = "0.12", features = ["json", "stream", "blocking"] }
+axum = { version = "0.8", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# Database
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Utils
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+regex = "1"
+glob = "0.3"
+dirs = "6"
+tokio-stream = "0.1"
+tokio-util = "0.7"
+futures = "0.3"
+async-trait = "0.1"
+rand = "0.9"
+
+# Error handling
+anyhow = "1"
+
+# Env
+dotenvy = "0.15"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
