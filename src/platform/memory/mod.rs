@@ -94,6 +94,19 @@ impl MemoryManager {
         })
     }
 
+    /// Open the memory database with custom budget limits from config.
+    pub fn with_budgets(
+        episodic: usize,
+        semantic: usize,
+        procedural: usize,
+    ) -> anyhow::Result<Self> {
+        let mut mm = Self::new()?;
+        mm.max_episodic = episodic;
+        mm.max_semantic = semantic;
+        mm.max_procedural = procedural;
+        Ok(mm)
+    }
+
     /// Open a memory database at a custom path (useful for testing).
     pub fn with_path(path: &str) -> anyhow::Result<Self> {
         let conn = Connection::open(path)?;

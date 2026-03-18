@@ -265,8 +265,12 @@ async fn setup_runtime(cfg: &config::Config) -> anyhow::Result<RuntimeStack> {
         Some(Arc::new(checker))
     };
 
-    // Load persistent memory.
-    let memory_text = match platform::memory::MemoryManager::new() {
+    // Load persistent memory with config budgets.
+    let memory_text = match platform::memory::MemoryManager::with_budgets(
+        cfg.memory.episodic_max_chars,
+        cfg.memory.semantic_max_chars,
+        cfg.memory.procedural_max_chars,
+    ) {
         Ok(mm) => mm.inject(&soul),
         Err(e) => {
             tracing::warn!("memory init failed (continuing without): {e}");

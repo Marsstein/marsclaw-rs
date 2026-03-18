@@ -186,7 +186,9 @@ async fn handle_send_message(
     };
 
     // Persist the user message.
-    let _ = state.store.append_messages(&id, &[user_msg.clone()]).await;
+    if let Err(e) = state.store.append_messages(&id, &[user_msg.clone()]).await {
+        tracing::warn!(session = %id, "failed to persist user message: {e}");
+    }
 
     // Auto-title on first message.
     if session.title == "New conversation" && !body.message.is_empty() {
@@ -242,7 +244,8 @@ async fn handle_send_message(
                         serde_json::json!({"type": "tool_start", "tool": tool_call.name})
                     }
                     StreamEvent::ToolDone { tool_call, output } => {
-                        serde_json::json!({"type": "tool_done", "tool": tool_call.name, "output": &output[..output.len().min(500)]})
+                        let truncated: String = output.chars().take(500).collect();
+                        serde_json::json!({"type": "tool_done", "tool": tool_call.name, "output": truncated})
                     }
                     StreamEvent::Error { message } => {
                         serde_json::json!({"type": "error", "message": message})
@@ -269,8 +272,12 @@ async fn handle_send_message(
         let cancel = CancellationToken::new();
         let result = agent.run(cancel, parts).await;
 
-        // Wait for forwarding to finish.
-        forward_handle.abort();
+        // Agent is done; stream_tx was moved into its handler and is now
+        // dropped, so the forward loop will exit when the channel drains.
+        let _ = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            forward_handle,
+        ).await;
 
         // Send final text if the agent produced a response.
         if !result.response.is_empty() {

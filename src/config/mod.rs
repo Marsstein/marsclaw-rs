@@ -15,12 +15,42 @@ pub struct Config {
     #[serde(default)]
     pub security: SecurityConfig,
     #[serde(default)]
+    pub memory: MemoryConfig,
+    #[serde(default)]
     pub mcp: Vec<McpServerConfig>,
     #[serde(default)]
     pub scheduler: SchedulerConfig,
     #[serde(default)]
     pub whatsapp: Option<WhatsAppConfig>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryConfig {
+    #[serde(default = "default_episodic_max")]
+    pub episodic_max_chars: usize,
+    #[serde(default = "default_semantic_max")]
+    pub semantic_max_chars: usize,
+    #[serde(default = "default_procedural_max")]
+    pub procedural_max_chars: usize,
+    #[serde(default = "default_consolidate_at")]
+    pub consolidate_at: usize,
+}
+
+impl Default for MemoryConfig {
+    fn default() -> Self {
+        Self {
+            episodic_max_chars: 8000,
+            semantic_max_chars: 4000,
+            procedural_max_chars: 2000,
+            consolidate_at: 80,
+        }
+    }
+}
+
+fn default_episodic_max() -> usize { 8000 }
+fn default_semantic_max() -> usize { 4000 }
+fn default_procedural_max() -> usize { 2000 }
+fn default_consolidate_at() -> usize { 80 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppConfig {
@@ -248,6 +278,7 @@ impl Default for Config {
             mcp: Vec::new(),
             scheduler: SchedulerConfig::default(),
             whatsapp: None,
+            memory: MemoryConfig::default(),
         }
     }
 }

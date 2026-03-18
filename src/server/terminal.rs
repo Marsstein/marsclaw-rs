@@ -193,8 +193,9 @@ fn print_history(history: &[Message]) {
             Role::System => ("system", DIM),
         };
 
-        let content = if msg.content.len() > 100 {
-            format!("{}...", &msg.content[..100])
+        let content = if msg.content.chars().count() > 100 {
+            let truncated: String = msg.content.chars().take(100).collect();
+            format!("{truncated}...")
         } else {
             msg.content.clone()
         };
