@@ -1,0 +1,193 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0e14"/>
+      <stop offset="30%" stop-color="#0d1117"/>
+      <stop offset="70%" stop-color="#111820"/>
+      <stop offset="100%" stop-color="#0a0e14"/>
+    </linearGradient>
+    <linearGradient id="claw" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff6e40"/>
+      <stop offset="35%" stop-color="#ff9100"/>
+      <stop offset="65%" stop-color="#ffab40"/>
+      <stop offset="100%" stop-color="#ff6e40"/>
+    </linearGradient>
+    <linearGradient id="claw2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff6e40"/>
+      <stop offset="100%" stop-color="#e64a19"/>
+    </linearGradient>
+    <linearGradient id="rust-accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff6e40"/>
+      <stop offset="50%" stop-color="#ff9100"/>
+      <stop offset="100%" stop-color="#ffab40"/>
+    </linearGradient>
+    <linearGradient id="glow1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff6e40" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#ff9100" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="glow2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#58a6ff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="title-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="60%" stop-color="#f0f0f0"/>
+      <stop offset="100%" stop-color="#e0e0e0"/>
+    </linearGradient>
+    <filter id="blur-lg">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="50"/>
+    </filter>
+    <filter id="blur-md">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="25"/>
+    </filter>
+    <filter id="blur-sm">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3"/>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+    <clipPath id="banner-clip">
+      <rect width="1280" height="640" rx="0"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#banner-clip)">
+    <!-- Background -->
+    <rect width="1280" height="640" fill="url(#bg)"/>
+
+    <!-- Noise texture (subtle) -->
+    <rect width="1280" height="640" fill="#0d1117" opacity="0.02"/>
+
+    <!-- Large ambient glows -->
+    <ellipse cx="640" cy="280" rx="400" ry="250" fill="url(#glow1)" filter="url(#blur-lg)"/>
+    <ellipse cx="350" cy="200" rx="200" ry="200" fill="#ff6e40" opacity="0.04" filter="url(#blur-lg)"/>
+    <ellipse cx="950" cy="400" rx="200" ry="180" fill="#58a6ff" opacity="0.03" filter="url(#blur-lg)"/>
+    <ellipse cx="640" cy="320" rx="500" ry="200" fill="url(#glow2)" filter="url(#blur-lg)"/>
+
+    <!-- Grid pattern -->
+    <g stroke="#1c2333" stroke-width="0.5" opacity="0.5">
+      <line x1="0" y1="128" x2="1280" y2="128"/>
+      <line x1="0" y1="256" x2="1280" y2="256"/>
+      <line x1="0" y1="384" x2="1280" y2="384"/>
+      <line x1="0" y1="512" x2="1280" y2="512"/>
+      <line x1="256" y1="0" x2="256" y2="640"/>
+      <line x1="512" y1="0" x2="512" y2="640"/>
+      <line x1="768" y1="0" x2="768" y2="640"/>
+      <line x1="1024" y1="0" x2="1024" y2="640"/>
+    </g>
+
+    <!-- Decorative dots at grid intersections -->
+    <g fill="#ff6e40" opacity="0.15">
+      <circle cx="512" cy="256" r="2"/>
+      <circle cx="768" cy="256" r="2"/>
+      <circle cx="512" cy="384" r="2"/>
+      <circle cx="768" cy="384" r="2"/>
+    </g>
+
+    <!-- Claw icon — three sharp talons -->
+    <g transform="translate(490, 115)">
+      <!-- Glow layer -->
+      <g stroke="url(#claw)" stroke-width="14" stroke-linecap="round" fill="none" opacity="0.2" filter="url(#blur-sm)">
+        <path d="M 75 0 Q 50 55 30 110 Q 18 148 45 175 Q 55 185 60 178"/>
+        <path d="M 150 0 Q 147 60 143 115 Q 140 150 148 180 Q 152 190 155 182"/>
+        <path d="M 225 0 Q 250 55 270 110 Q 282 148 255 175 Q 245 185 240 178"/>
+      </g>
+      <!-- Main talons -->
+      <g stroke="url(#claw)" stroke-width="7" stroke-linecap="round" fill="none">
+        <path d="M 75 0 Q 50 55 30 110 Q 18 148 45 175 Q 55 185 60 178"/>
+        <path d="M 150 0 Q 147 60 143 115 Q 140 150 148 180 Q 152 190 155 182"/>
+        <path d="M 225 0 Q 250 55 270 110 Q 282 148 255 175 Q 245 185 240 178"/>
+      </g>
+      <!-- Scratch marks (subtle) -->
+      <g stroke="#ff6e40" stroke-width="1.5" stroke-linecap="round" opacity="0.25">
+        <line x1="55" y1="80" x2="42" y2="130"/>
+        <line x1="145" y1="75" x2="141" y2="135"/>
+        <line x1="245" y1="80" x2="258" y2="130"/>
+      </g>
+    </g>
+
+    <!-- Rust gear icon (small, next to claw) -->
+    <g transform="translate(755, 200)" fill="none" stroke="#ff9100" stroke-width="1.5" opacity="0.3">
+      <circle cx="0" cy="0" r="12"/>
+      <circle cx="0" cy="0" r="6"/>
+      <!-- Gear teeth -->
+      <line x1="0" y1="-16" x2="0" y2="-12"/>
+      <line x1="0" y1="12" x2="0" y2="16"/>
+      <line x1="-16" y1="0" x2="-12" y2="0"/>
+      <line x1="12" y1="0" x2="16" y2="0"/>
+      <line x1="-11" y1="-11" x2="-8.5" y2="-8.5"/>
+      <line x1="8.5" y1="-8.5" x2="11" y2="-11"/>
+      <line x1="-11" y1="11" x2="-8.5" y2="8.5"/>
+      <line x1="8.5" y1="8.5" x2="11" y2="11"/>
+    </g>
+
+    <!-- Title: MarsClaw -->
+    <text x="640" y="380" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="78" font-weight="800" fill="url(#title-grad)" letter-spacing="-3" filter="url(#shadow)">
+      MarsClaw
+    </text>
+
+    <!-- Subtitle -->
+    <text x="640" y="425" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="22" fill="#8b949e" font-weight="400" letter-spacing="2">
+      The world's fastest AI agent runtime
+    </text>
+
+    <!-- "Written in Rust" accent -->
+    <g transform="translate(640, 458)" text-anchor="middle">
+      <rect x="-72" y="-14" width="144" height="28" rx="14" fill="#ff6e40" opacity="0.12"/>
+      <text font-family="'SF Mono', 'Cascadia Code', 'Fira Code', monospace" font-size="13" font-weight="600" fill="#ff9100" y="5">Written in Rust</text>
+    </g>
+
+    <!-- Feature badges -->
+    <g transform="translate(640, 505)" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', 'Fira Code', monospace" font-size="13" font-weight="500">
+      <!-- Badge 1: Binary -->
+      <g transform="translate(-370, 0)">
+        <rect x="-52" y="-14" width="104" height="28" rx="14" fill="#ff6e40" opacity="0.12"/>
+        <text fill="#ffab40" y="5">5MB binary</text>
+      </g>
+      <!-- Badge 2: Memory -->
+      <g transform="translate(-215, 0)">
+        <rect x="-48" y="-14" width="96" height="28" rx="14" fill="#58a6ff" opacity="0.12"/>
+        <text fill="#58a6ff" y="5">3MB RAM</text>
+      </g>
+      <!-- Badge 3: Providers -->
+      <g transform="translate(-65, 0)">
+        <rect x="-65" y="-14" width="130" height="28" rx="14" fill="#bc8cff" opacity="0.12"/>
+        <text fill="#bc8cff" y="5">4 LLM providers</text>
+      </g>
+      <!-- Badge 4: Channels -->
+      <g transform="translate(110, 0)">
+        <rect x="-60" y="-14" width="120" height="28" rx="14" fill="#3fb950" opacity="0.12"/>
+        <text fill="#3fb950" y="5">5 chat channels</text>
+      </g>
+      <!-- Badge 5: Agents -->
+      <g transform="translate(280, 0)">
+        <rect x="-62" y="-14" width="124" height="28" rx="14" fill="#d29922" opacity="0.12"/>
+        <text fill="#d29922" y="5">4 agent patterns</text>
+      </g>
+      <!-- Badge 6: Cold start -->
+      <g transform="translate(430, 0)">
+        <rect x="-55" y="-14" width="110" height="28" rx="14" fill="#f778ba" opacity="0.12"/>
+        <text fill="#f778ba" y="5">&lt;10ms startup</text>
+      </g>
+    </g>
+
+    <!-- Terminal preview -->
+    <g transform="translate(290, 548)">
+      <rect width="700" height="65" rx="10" fill="#0d1117" stroke="#1c2333" stroke-width="1.5"/>
+      <!-- Window controls -->
+      <circle cx="22" cy="18" r="5.5" fill="#ff5f57"/>
+      <circle cx="42" cy="18" r="5.5" fill="#febc2e"/>
+      <circle cx="62" cy="18" r="5.5" fill="#28c840"/>
+      <!-- Terminal text -->
+      <text x="22" y="50" font-family="'SF Mono', 'Cascadia Code', 'Fira Code', monospace" font-size="14.5">
+        <tspan fill="#6e7681">$</tspan>
+        <tspan fill="#ff9100"> cargo install</tspan>
+        <tspan fill="#e6edf3"> marsclaw</tspan>
+        <tspan fill="#6e7681">  # single binary, zero deps, deploy anywhere</tspan>
+      </text>
+    </g>
+
+    <!-- Subtle top border accent -->
+    <rect x="0" y="0" width="1280" height="2" fill="url(#rust-accent)" opacity="0.6"/>
+  </g>
+</svg>

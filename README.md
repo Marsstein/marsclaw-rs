@@ -1,9 +1,5 @@
 <p align="center">
-  <h1 align="center">MarsClaw</h1>
-  <p align="center"><strong>The world's fastest AI agent runtime. Written in Rust.</strong></p>
-  <p align="center">
-    Single binary. Zero dependencies. 5MB. Deploy anywhere in seconds.
-  </p>
+  <img src="assets/banner.svg" alt="MarsClaw — The world's fastest AI agent runtime" width="100%">
 </p>
 
 <p align="center">
