@@ -78,6 +78,8 @@ marsclaw init
 
 ## Comparison
 
+### Performance & Footprint
+
 |  | Claude Code | Aider | Goose | Cursor | OpenHands | **MarsClaw** |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | **Language** | TypeScript | Python | Python | Electron | Python | **Rust** |
@@ -87,38 +89,53 @@ marsclaw init
 | **Runtime deps** | Node.js | Python + pip | Python + pip | Chromium | Docker | **0** |
 | **Single binary** | No | No | No | No | No | **Yes** |
 | **Known CVEs** | Inherits npm | Inherits pip | Inherits pip | Chromium | Docker | **0** |
-| | | | | | | |
-| **LLM providers** | Anthropic | 20+ | 10+ | 5+ | 10+ | **4 native + any OpenAI-compatible** |
-| **Anthropic (native API)** | Yes | Yes | Yes | Yes | Yes | **Yes** |
+
+### LLM Providers
+
+|  | Claude Code | Aider | Goose | Cursor | OpenHands | **MarsClaw** |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Anthropic (native)** | Yes | Yes | Yes | Yes | Yes | **Yes** |
 | **OpenAI** | No | Yes | Yes | Yes | Yes | **Yes** |
 | **Gemini** | No | Yes | Yes | No | Yes | **Yes** |
-| **Ollama (fully offline)** | No | Yes | Yes | No | Yes | **Yes** |
-| **Any OpenAI-compatible** | No | Yes | Yes | No | Yes | **Yes (Groq, Together, DeepSeek, vLLM, LM Studio)** |
-| | | | | | | |
-| **Multi-agent orchestration** | No | No | Partial | No | Yes | **4 patterns** |
+| **Ollama (offline)** | No | Yes | Yes | No | Yes | **Yes** |
+| **OpenAI-compatible** | No | Yes | Yes | No | Yes | **Yes** |
+
+> MarsClaw supports 4 native providers + any OpenAI-compatible endpoint (Groq, Together, DeepSeek, Azure, vLLM, LM Studio).
+
+### Multi-Agent Orchestration
+
+|  | Claude Code | Aider | Goose | Cursor | OpenHands | **MarsClaw** |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | **Pipeline (sequential)** | No | No | No | No | Yes | **Yes** |
 | **Parallel (fan-out)** | No | No | No | No | No | **Yes** |
 | **Debate (adversarial)** | No | No | No | No | No | **Yes** |
 | **Supervisor (coordinator)** | No | No | Yes | No | Yes | **Yes** |
 | **Sub-agent delegation** | No | No | No | No | No | **Yes** |
-| | | | | | | |
-| **Chat channels** | 0 | 0 | 0 | 0 | 0 | **5** |
-| **Telegram bot** | No | No | No | No | No | **Yes** |
-| **Discord bot** | No | No | No | No | No | **Yes** |
-| **Slack bot** | No | No | No | No | No | **Yes** |
-| **WhatsApp bot** | No | No | No | No | No | **Yes** |
+
+### Chat Channels
+
+|  | Claude Code | Aider | Goose | Cursor | OpenHands | **MarsClaw** |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Telegram** | No | No | No | No | No | **Yes** |
+| **Discord** | No | No | No | No | No | **Yes** |
+| **Slack** | No | No | No | No | No | **Yes** |
+| **WhatsApp** | No | No | No | No | No | **Yes** |
 | **Instagram** | No | No | No | No | No | **Yes** |
-| | | | | | | |
-| **Web dashboard** | No | No | No | Yes | Yes | **Built-in (embedded)** |
-| **MCP client** | Yes | No | Yes | No | No | **Yes (JSON-RPC 2.0)** |
-| **Persistent memory** | No | No | No | No | No | **Yes (episodic/semantic/procedural)** |
-| **Skills / prompt packs** | No | No | No | No | No | **5 built-in + installable** |
-| **Scheduled tasks** | No | No | No | No | No | **Cron + intervals** |
-| **Cost tracking** | Yes | Yes | No | No | No | **Yes (daily/monthly budgets)** |
+
+### Platform Features
+
+|  | Claude Code | Aider | Goose | Cursor | OpenHands | **MarsClaw** |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Web dashboard** | No | No | No | Yes | Yes | **Yes (embedded)** |
+| **MCP client** | Yes | No | Yes | No | No | **Yes** |
+| **Persistent memory** | No | No | No | No | No | **Yes** |
+| **Skills / prompt packs** | No | No | No | No | No | **Yes (5 + installable)** |
+| **Scheduled tasks** | No | No | No | No | No | **Yes (cron)** |
+| **Cost tracking** | Yes | Yes | No | No | No | **Yes (daily/monthly)** |
 | **Credential scanning** | No | No | No | No | No | **Yes** |
-| **Tool approval workflow** | Yes | No | No | No | No | **Yes (per danger level)** |
-| **Session persistence** | No | Yes | No | No | Yes | **SQLite** |
-| **Hook system** | No | No | No | No | No | **Yes (lifecycle events)** |
+| **Tool approval** | Yes | No | No | No | No | **Yes (per danger level)** |
+| **Session persistence** | No | Yes | No | No | Yes | **Yes (SQLite)** |
+| **Hook system** | No | No | No | No | No | **Yes** |
 | **Offline mode** | No | Yes | Yes | No | No | **Yes (Ollama)** |
 | **Self-hosted** | No | Yes | Yes | No | Yes | **Yes** |
 | **Open source** | No | Yes | Yes | No | Yes | **Yes (Apache-2.0)** |
