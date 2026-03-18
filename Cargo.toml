@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2024"
 description = "The fastest AI agent runtime. Written in Rust."
 license = "Apache-2.0"
-repository = "https://github.com/marsstein/marsclaw"
+repository = "https://github.com/Marsstein/marsclaw-rs"
+homepage = "https://marsclaw.dev"
 keywords = ["ai", "agent", "llm", "runtime", "cli"]
 categories = ["command-line-utilities", "web-programming"]
 
