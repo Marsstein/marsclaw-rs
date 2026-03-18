@@ -385,6 +385,7 @@ async fn run_serve(cfg: &config::Config, addr: &str) -> anyhow::Result<()> {
                 cfg.agent.clone(),
                 rt.registry.clone(),
                 rt.cost.clone(),
+                rt.safety.clone(),
                 db.clone(),
                 &rt.soul,
                 &rt.model,
@@ -475,7 +476,7 @@ async fn run_telegram(cfg: &config::Config, channel_id: Option<&str>) -> anyhow:
     let db: Arc<dyn store::Store> = Arc::new(store::SqliteStore::new()?);
 
     let bot = telegram::TelegramBot::new(
-        &token, rt.provider, cfg.agent.clone(), rt.registry, rt.cost, db, &rt.soul, &rt.model,
+        &token, rt.provider, cfg.agent.clone(), rt.registry, rt.cost, rt.safety, db, &rt.soul, &rt.model,
     );
 
     bot.run().await
@@ -677,6 +678,7 @@ async fn run_whatsapp(cfg: &config::Config, _channel_id: Option<&str>) -> anyhow
         cfg.agent.clone(),
         rt.registry,
         rt.cost,
+        rt.safety,
         db,
         &rt.soul,
         &rt.model,

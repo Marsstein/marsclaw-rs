@@ -11,7 +11,7 @@ use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
-use crate::agent::Agent;
+use crate::agent::{Agent, SafetyCheck};
 use crate::config::AgentConfig;
 use crate::store::{self, Store};
 use crate::tool::Registry;
@@ -58,6 +58,7 @@ pub struct TelegramBot {
     config: AgentConfig,
     registry: Registry,
     cost: Arc<dyn CostRecorder>,
+    safety: Option<Arc<dyn SafetyCheck>>,
     store: Arc<dyn Store>,
     soul: String,
     model: String,
@@ -71,6 +72,7 @@ impl TelegramBot {
         config: AgentConfig,
         registry: Registry,
         cost: Arc<dyn CostRecorder>,
+        safety: Option<Arc<dyn SafetyCheck>>,
         store: Arc<dyn Store>,
         soul: &str,
         model: &str,
@@ -82,6 +84,7 @@ impl TelegramBot {
             config,
             registry,
             cost,
+            safety,
             store,
             soul: soul.to_owned(),
             model: model.to_owned(),
@@ -252,13 +255,17 @@ impl TelegramBot {
         let mut agent_cfg = self.config.clone();
         agent_cfg.enable_streaming = false;
 
-        let agent = Agent::new(
+        let mut agent = Agent::new(
             self.provider.clone(),
             agent_cfg,
             self.registry.executors().clone(),
             self.registry.defs().to_vec(),
         )
         .with_cost_tracker(self.cost.clone());
+
+        if let Some(ref safety) = self.safety {
+            agent = agent.with_safety(safety.clone());
+        }
 
         let parts = ContextParts {
             soul_prompt: self.soul.clone(),
