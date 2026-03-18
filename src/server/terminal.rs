@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-use crate::agent::Agent;
+use crate::agent::{Agent, SafetyCheck};
 use crate::config::AgentConfig;
 use crate::tool::Registry;
 use crate::types::*;
@@ -27,6 +27,7 @@ pub async fn run(
     config: AgentConfig,
     registry: Registry,
     cost: Arc<dyn CostRecorder>,
+    safety: Option<Arc<dyn SafetyCheck>>,
     soul: &str,
     model: &str,
 ) -> anyhow::Result<()> {
@@ -88,7 +89,7 @@ pub async fn run(
 
         println!();
 
-        let agent = Agent::new(
+        let mut agent = Agent::new(
             provider.clone(),
             config.clone(),
             registry.executors().clone(),
@@ -96,6 +97,10 @@ pub async fn run(
         )
         .with_stream_handler(stream_handler)
         .with_cost_tracker(cost.clone());
+
+        if let Some(ref s) = safety {
+            agent = agent.with_safety(s.clone());
+        }
 
         let cancel = CancellationToken::new();
         let result = agent.run(cancel, parts).await;

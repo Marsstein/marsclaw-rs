@@ -5,7 +5,7 @@
 use std::io::{self, BufRead, Write as IoWrite};
 use std::path::PathBuf;
 
-use crate::channels::{Channel, ChannelStore};
+use crate::bots::channels::{Channel, ChannelStore};
 
 // ANSI escape codes.
 const BOLD: &str = "\x1b[1m";

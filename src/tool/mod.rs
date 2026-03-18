@@ -88,6 +88,16 @@ impl Registry {
         );
         r
     }
+
+    /// Merge additional tool definitions and executors into this registry.
+    pub fn merge(&mut self, defs: Vec<ToolDef>, executors: HashMap<String, Arc<dyn ToolExecutor>>) {
+        for def in defs {
+            self.executors
+                .entry(def.name.clone())
+                .or_insert_with(|| executors.get(&def.name).unwrap().clone());
+            self.defs.push(def);
+        }
+    }
 }
 
 impl Default for Registry {

@@ -1,24 +1,15 @@
 mod agent;
-mod channels;
+mod bots;
 mod config;
-mod discord;
-mod hooks;
 mod llm;
-mod mcp;
-mod memory;
-mod orchestration;
-mod scheduler;
-mod security;
+mod platform;
 mod server;
-mod setup;
-mod skills;
-mod slack;
 mod store;
-mod telegram;
-mod terminal;
 mod tool;
 mod types;
-mod whatsapp;
+
+use bots::{channels, discord, slack, telegram, whatsapp};
+use platform::{scheduler, security, skills};
 
 use std::sync::Arc;
 
@@ -178,7 +169,7 @@ async fn main() -> anyhow::Result<()> {
             run_whatsapp(&cfg, channel.as_deref()).await
         }
         Some(Commands::Init) => {
-            setup::run_wizard()?;
+            config::setup::run_wizard()?;
             Ok(())
         }
         Some(Commands::Channels { action }) => {
@@ -213,27 +204,98 @@ async fn main() -> anyhow::Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// Interactive chat
+// Shared runtime setup: provider + registry + MCP + safety + memory
 // ---------------------------------------------------------------------------
 
-async fn run_interactive(cfg: &config::Config) -> anyhow::Result<()> {
+/// Everything the agent needs to run, built from config.
+struct RuntimeStack {
+    provider: Arc<dyn Provider>,
+    registry: tool::Registry,
+    cost: Arc<dyn CostRecorder>,
+    safety: Option<Arc<dyn agent::SafetyCheck>>,
+    soul: String,
+    agent_prompt: String,
+    memory_text: String,
+    model: String,
+}
+
+async fn setup_runtime(cfg: &config::Config) -> anyhow::Result<RuntimeStack> {
     let provider = create_provider(cfg)?;
     let cwd = std::env::current_dir()
         .unwrap_or_default()
         .to_string_lossy()
         .to_string();
-    let registry = tool::Registry::default_registry(&cwd);
+    let mut registry = tool::Registry::default_registry(&cwd);
     let cost = create_cost_tracker(cfg);
     let model = cfg.model().to_string();
 
-    let (soul, _agents) = agent::discovery::discover_project_prompts(&cwd);
-    let soul = skills::get_active_prompt().unwrap_or(if soul.is_empty() {
+    // Discover project prompts.
+    let (discovered_soul, agent_prompt) = agent::discovery::discover_project_prompts(&cwd);
+    let soul = skills::get_active_prompt().unwrap_or(if discovered_soul.is_empty() {
         DEFAULT_SOUL.to_string()
     } else {
-        soul
+        discovered_soul
     });
 
-    terminal::run(provider, cfg.agent.clone(), registry, cost, &soul, &model).await
+    // Wire MCP tools into the registry.
+    if !cfg.mcp.is_empty() {
+        match platform::mcp::register_mcp_servers(&cfg.mcp).await {
+            Ok((defs, executors, _clients)) => {
+                tracing::info!(count = defs.len(), "MCP tools registered");
+                registry.merge(defs, executors);
+            }
+            Err(e) => {
+                tracing::warn!("MCP registration failed (continuing without): {e}");
+            }
+        }
+    }
+
+    // Build safety checker from config.
+    let safety: Option<Arc<dyn agent::SafetyCheck>> = {
+        let checker = security::SafetyChecker::new(
+            security::SafetyConfig {
+                strict_approval: cfg.security.strict_approval,
+                scan_credentials: cfg.security.scan_credentials,
+                path_traversal_guard: cfg.security.path_traversal_guard,
+                allowed_dirs: cfg.security.allowed_dirs.clone(),
+            },
+            registry.defs(),
+            None,
+        );
+        Some(Arc::new(checker))
+    };
+
+    // Load persistent memory.
+    let memory_text = match platform::memory::MemoryManager::new() {
+        Ok(mm) => mm.inject(&soul),
+        Err(e) => {
+            tracing::warn!("memory init failed (continuing without): {e}");
+            String::new()
+        }
+    };
+
+    Ok(RuntimeStack {
+        provider,
+        registry,
+        cost,
+        safety,
+        soul,
+        agent_prompt,
+        memory_text,
+        model,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Interactive chat
+// ---------------------------------------------------------------------------
+
+async fn run_interactive(cfg: &config::Config) -> anyhow::Result<()> {
+    let rt = setup_runtime(cfg).await?;
+    server::terminal::run(
+        rt.provider, cfg.agent.clone(), rt.registry, rt.cost, rt.safety,
+        &rt.soul, &rt.model,
+    ).await
 }
 
 // ---------------------------------------------------------------------------
@@ -241,27 +303,13 @@ async fn run_interactive(cfg: &config::Config) -> anyhow::Result<()> {
 // ---------------------------------------------------------------------------
 
 async fn run_single_prompt(cfg: &config::Config, prompt: &str) -> anyhow::Result<()> {
-    let provider = create_provider(cfg)?;
-    let cwd = std::env::current_dir()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    let registry = tool::Registry::default_registry(&cwd);
-    let cost = create_cost_tracker(cfg);
-    let model = cfg.model().to_string();
+    let rt = setup_runtime(cfg).await?;
 
-    let (soul, agent_prompt) = agent::discovery::discover_project_prompts(&cwd);
-    let soul = skills::get_active_prompt().unwrap_or(if soul.is_empty() {
-        DEFAULT_SOUL.to_string()
-    } else {
-        soul
-    });
-
-    let agent = agent::Agent::new(
-        provider,
+    let mut agent = agent::Agent::new(
+        rt.provider,
         cfg.agent.clone(),
-        registry.executors().clone(),
-        registry.defs().to_vec(),
+        rt.registry.executors().clone(),
+        rt.registry.defs().to_vec(),
     )
     .with_stream_handler(|ev| {
         match ev {
@@ -281,17 +329,21 @@ async fn run_single_prompt(cfg: &config::Config, prompt: &str) -> anyhow::Result
             }
         }
     })
-    .with_cost_tracker(cost.clone());
+    .with_cost_tracker(rt.cost.clone());
+
+    if let Some(safety) = rt.safety {
+        agent = agent.with_safety(safety);
+    }
 
     let parts = ContextParts {
-        soul_prompt: soul,
-        agent_prompt,
+        soul_prompt: rt.soul,
+        agent_prompt: rt.agent_prompt,
+        memory: rt.memory_text,
         history: vec![Message {
             role: Role::User,
             content: prompt.to_string(),
             ..Default::default()
         }],
-        ..Default::default()
     };
 
     let cancel = CancellationToken::new();
@@ -299,7 +351,7 @@ async fn run_single_prompt(cfg: &config::Config, prompt: &str) -> anyhow::Result
     println!();
 
     if cfg.cost.inline_display {
-        let cost_line = cost.format_cost_line(&model, result.total_input, result.total_output);
+        let cost_line = rt.cost.format_cost_line(&rt.model, result.total_input, result.total_output);
         eprintln!("\x1b[2m{cost_line}\x1b[0m");
     }
 
@@ -315,22 +367,7 @@ async fn run_single_prompt(cfg: &config::Config, prompt: &str) -> anyhow::Result
 // ---------------------------------------------------------------------------
 
 async fn run_serve(cfg: &config::Config, addr: &str) -> anyhow::Result<()> {
-    let provider = create_provider(cfg)?;
-    let model = cfg.model().to_string();
-    let cwd = std::env::current_dir()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    let registry = tool::Registry::default_registry(&cwd);
-    let cost = create_cost_tracker(cfg);
-
-    let (soul, _) = agent::discovery::discover_project_prompts(&cwd);
-    let soul = skills::get_active_prompt().unwrap_or(if soul.is_empty() {
-        DEFAULT_SOUL.to_string()
-    } else {
-        soul
-    });
-
+    let rt = setup_runtime(cfg).await?;
     let db: Arc<dyn store::Store> = Arc::new(store::SqliteStore::new()?);
 
     // Mount WhatsApp webhook if configured.
@@ -340,13 +377,13 @@ async fn run_serve(cfg: &config::Config, addr: &str) -> anyhow::Result<()> {
                 &wa_cfg.phone_number_id,
                 &wa_cfg.access_token,
                 &wa_cfg.verify_token,
-                provider.clone(),
+                rt.provider.clone(),
                 cfg.agent.clone(),
-                registry.clone(),
-                cost.clone(),
+                rt.registry.clone(),
+                rt.cost.clone(),
                 db.clone(),
-                &soul,
-                &model,
+                &rt.soul,
+                &rt.model,
             ));
             tracing::info!("whatsapp webhook mounted at /webhook/whatsapp");
             Some(bot.router())
@@ -356,6 +393,38 @@ async fn run_serve(cfg: &config::Config, addr: &str) -> anyhow::Result<()> {
     } else {
         None
     };
+
+    // Start scheduler in background if tasks are configured.
+    let enabled_tasks: Vec<_> = cfg.scheduler.tasks.iter()
+        .filter(|t| t.enabled)
+        .map(|t| scheduler::Task {
+            id: t.id.clone(),
+            name: t.name.clone(),
+            schedule: t.schedule.clone(),
+            prompt: t.prompt.clone(),
+            channel: t.channel.clone(),
+            enabled: true,
+        })
+        .collect();
+
+    let cancel = CancellationToken::new();
+    if !enabled_tasks.is_empty() {
+        let sched = scheduler::Scheduler::new(
+            enabled_tasks,
+            rt.provider.clone(),
+            cfg.agent.clone(),
+            rt.registry.clone(),
+            rt.soul.clone(),
+            Arc::new(|channel: &str, msg: &str| {
+                tracing::info!(channel = channel, "scheduler output: {}", &msg[..msg.len().min(200)]);
+            }),
+        );
+        let sched_cancel = cancel.clone();
+        tokio::spawn(async move {
+            sched.run(sched_cancel).await;
+        });
+        tracing::info!(count = cfg.scheduler.tasks.len(), "scheduler started");
+    }
 
     // Build task info for dashboard.
     let tasks: Vec<server::TaskInfo> = cfg
@@ -373,16 +442,23 @@ async fn run_serve(cfg: &config::Config, addr: &str) -> anyhow::Result<()> {
 
     let server_config = server::ServerConfig {
         addr: addr.to_string(),
-        model,
-        soul,
+        model: rt.model,
+        soul: rt.soul,
         tasks,
+        provider: rt.provider,
+        agent_cfg: cfg.agent.clone(),
+        registry: rt.registry,
+        cost: rt.cost,
+        safety: rt.safety,
     };
 
     eprintln!(
         "\x1b[1m\x1b[36mMarsClaw server running at http://localhost{addr}\x1b[0m"
     );
 
-    server::run(server_config, db, extra).await
+    let result = server::run(server_config, db, extra).await;
+    cancel.cancel();
+    result
 }
 
 // ---------------------------------------------------------------------------
@@ -390,29 +466,12 @@ async fn run_serve(cfg: &config::Config, addr: &str) -> anyhow::Result<()> {
 // ---------------------------------------------------------------------------
 
 async fn run_telegram(cfg: &config::Config, channel_id: Option<&str>) -> anyhow::Result<()> {
-    // Resolve token: env var > channels.json > error.
     let token = resolve_telegram_token(channel_id)?;
-
-    let provider = create_provider(cfg)?;
-    let cwd = std::env::current_dir()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    let registry = tool::Registry::default_registry(&cwd);
-    let cost = create_cost_tracker(cfg);
-    let model = cfg.model().to_string();
-
-    let (soul, _) = agent::discovery::discover_project_prompts(&cwd);
-    let soul = skills::get_active_prompt().unwrap_or(if soul.is_empty() {
-        DEFAULT_SOUL.to_string()
-    } else {
-        soul
-    });
-
+    let rt = setup_runtime(cfg).await?;
     let db: Arc<dyn store::Store> = Arc::new(store::SqliteStore::new()?);
 
     let bot = telegram::TelegramBot::new(
-        &token, provider, cfg.agent.clone(), registry, cost, db, &soul, &model,
+        &token, rt.provider, cfg.agent.clone(), rt.registry, rt.cost, db, &rt.soul, &rt.model,
     );
 
     bot.run().await
@@ -460,33 +519,18 @@ fn resolve_telegram_token(channel_id: Option<&str>) -> anyhow::Result<String> {
 
 async fn run_discord(cfg: &config::Config, channel_id: Option<&str>) -> anyhow::Result<()> {
     let token = resolve_discord_token(channel_id)?;
-
-    let provider = create_provider(cfg)?;
-    let cwd = std::env::current_dir()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    let registry = tool::Registry::default_registry(&cwd);
-    let cost = create_cost_tracker(cfg);
-
-    let (soul, _) = agent::discovery::discover_project_prompts(&cwd);
-    let soul = skills::get_active_prompt().unwrap_or(if soul.is_empty() {
-        DEFAULT_SOUL.to_string()
-    } else {
-        soul
-    });
-
+    let rt = setup_runtime(cfg).await?;
     let db: Arc<dyn store::Store> = Arc::new(store::SqliteStore::new()?);
 
     let bot = discord::DiscordBot::new(discord::DiscordBotConfig {
         token,
-        provider,
+        provider: rt.provider,
         agent_cfg: cfg.agent.clone(),
-        registry,
-        safety: None,
-        cost,
+        registry: rt.registry,
+        safety: rt.safety,
+        cost: rt.cost,
         store: db,
-        soul,
+        soul: rt.soul,
     });
 
     let cancel = CancellationToken::new();
@@ -539,34 +583,19 @@ fn resolve_discord_token(channel_id: Option<&str>) -> anyhow::Result<String> {
 
 async fn run_slack(cfg: &config::Config, channel_id: Option<&str>) -> anyhow::Result<()> {
     let (bot_token, app_token) = resolve_slack_tokens(channel_id)?;
-
-    let provider = create_provider(cfg)?;
-    let cwd = std::env::current_dir()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    let registry = tool::Registry::default_registry(&cwd);
-    let cost = create_cost_tracker(cfg);
-
-    let (soul, _) = agent::discovery::discover_project_prompts(&cwd);
-    let soul = skills::get_active_prompt().unwrap_or(if soul.is_empty() {
-        DEFAULT_SOUL.to_string()
-    } else {
-        soul
-    });
-
+    let rt = setup_runtime(cfg).await?;
     let db: Arc<dyn store::Store> = Arc::new(store::SqliteStore::new()?);
 
     let bot = slack::SlackBot::new(slack::SlackBotConfig {
         bot_token,
         app_token,
-        provider,
+        provider: rt.provider,
         agent_cfg: cfg.agent.clone(),
-        registry,
-        safety: None,
-        cost,
+        registry: rt.registry,
+        safety: rt.safety,
+        cost: rt.cost,
         store: db,
-        soul,
+        soul: rt.soul,
     });
 
     let cancel = CancellationToken::new();
@@ -633,35 +662,20 @@ async fn run_whatsapp(cfg: &config::Config, _channel_id: Option<&str>) -> anyhow
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("No WhatsApp config found. Add [whatsapp] section to config.yaml"))?;
 
-    let provider = create_provider(cfg)?;
-    let cwd = std::env::current_dir()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    let registry = tool::Registry::default_registry(&cwd);
-    let cost = create_cost_tracker(cfg);
-    let model = cfg.model().to_string();
-
-    let (soul, _) = agent::discovery::discover_project_prompts(&cwd);
-    let soul = skills::get_active_prompt().unwrap_or(if soul.is_empty() {
-        DEFAULT_SOUL.to_string()
-    } else {
-        soul
-    });
-
+    let rt = setup_runtime(cfg).await?;
     let db: Arc<dyn store::Store> = Arc::new(store::SqliteStore::new()?);
 
     let bot = Arc::new(whatsapp::WhatsAppBot::new(
         &wa_cfg.phone_number_id,
         &wa_cfg.access_token,
         &wa_cfg.verify_token,
-        provider,
+        rt.provider,
         cfg.agent.clone(),
-        registry,
-        cost,
+        rt.registry,
+        rt.cost,
         db,
-        &soul,
-        &model,
+        &rt.soul,
+        &rt.model,
     ));
 
     let app = bot.router();

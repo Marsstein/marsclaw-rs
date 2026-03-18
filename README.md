@@ -221,26 +221,14 @@ Options:
 ```
 src/                        10,500+ lines of Rust
   main.rs                   CLI entry point (clap)
-  agent/                    Agent loop + context builder + sub-agent orchestrator
+  agent/                    Agent loop, context builder, sub-agent orchestrator
+  bots/                     Telegram, Discord, Slack, WhatsApp + channel management
+  config/                   YAML + env var configuration + setup wizard
   llm/                      4 providers (Anthropic, OpenAI, Gemini, Ollama) + cost + retry
-  tool/                     7 built-in tools (read, write, edit, shell, list, search, git)
-  server/                   HTTP server (axum) + embedded Web UI
+  platform/                 Memory, hooks, MCP, scheduler, skills, security
+  server/                   HTTP server (axum) + embedded Web UI + terminal REPL
   store/                    SQLite persistence (rusqlite)
-  telegram/                 Telegram bot (long-polling)
-  discord/                  Discord bot (Gateway WebSocket)
-  slack/                    Slack bot (Socket Mode)
-  whatsapp/                 WhatsApp bot (Cloud API webhook)
-  channels/                 Channel management CLI
-  orchestration/            Multi-agent patterns (pipeline, parallel, debate, supervisor)
-  memory/                   Persistent memory system (SQLite)
-  hooks/                    Agent lifecycle hooks
-  mcp/                      MCP JSON-RPC 2.0 client
-  skills/                   Installable prompt packs
-  scheduler/                Cron-based task automation
-  security/                 Credential scanning + path guards
-  config/                   YAML + env var configuration
-  terminal/                 Interactive REPL
-  setup/                    Setup wizard
+  tool/                     7 built-in tools (read, write, edit, shell, list, search, git)
   types/                    Shared types and traits
 ```
 

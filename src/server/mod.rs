@@ -2,6 +2,8 @@
 //!
 //! Ported from Go: internal/server/server.go
 
+pub mod terminal;
+
 use std::convert::Infallible;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -14,8 +16,13 @@ use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use tokio_util::sync::CancellationToken;
+
+use crate::agent::{Agent, SafetyCheck};
+use crate::config::AgentConfig;
 use crate::store::{Session, Store};
-use crate::types::Message;
+use crate::tool::Registry;
+use crate::types::*;
 
 // ---------------------------------------------------------------------------
 // Embedded UI
@@ -32,6 +39,11 @@ pub struct ServerConfig {
     pub model: String,
     pub soul: String,
     pub tasks: Vec<TaskInfo>,
+    pub provider: Arc<dyn Provider>,
+    pub agent_cfg: AgentConfig,
+    pub registry: Registry,
+    pub cost: Arc<dyn CostRecorder>,
+    pub safety: Option<Arc<dyn SafetyCheck>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,7 +61,14 @@ pub struct TaskInfo {
 
 struct AppState {
     store: Arc<dyn Store>,
-    config: ServerConfig,
+    model: String,
+    soul: String,
+    tasks: Vec<TaskInfo>,
+    provider: Arc<dyn Provider>,
+    agent_cfg: AgentConfig,
+    registry: Registry,
+    cost: Arc<dyn CostRecorder>,
+    safety: Option<Arc<dyn SafetyCheck>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -157,17 +176,17 @@ async fn handle_send_message(
     };
 
     // Load history.
-    let _history = state.store.get_messages(&id).await.unwrap_or_default();
+    let history = state.store.get_messages(&id).await.unwrap_or_default();
 
     let user_msg = Message {
-        role: crate::types::Role::User,
+        role: Role::User,
         content: body.message.clone(),
         timestamp: Utc::now(),
         ..Default::default()
     };
 
     // Persist the user message.
-    let _ = state.store.append_messages(&id, &[user_msg]).await;
+    let _ = state.store.append_messages(&id, &[user_msg.clone()]).await;
 
     // Auto-title on first message.
     if session.title == "New conversation" && !body.message.is_empty() {
@@ -180,32 +199,121 @@ async fn handle_send_message(
         let _ = state.store.update_title(&id, &title).await;
     }
 
-    // Return SSE stream. The agent integration will be wired later;
-    // for now we emit a placeholder response and [DONE].
-    let stream = futures::stream::iter(vec![
-        Ok::<_, Infallible>(
-            Event::default()
-                .data(serde_json::to_string(&serde_json::json!({"type": "text", "delta": "Agent not yet connected.", "done": true})).unwrap()),
-        ),
-        Ok(Event::default().data("[DONE]")),
-    ]);
+    // Build the agent and run it, streaming results via SSE.
+    let provider = state.provider.clone();
+    let agent_cfg = state.agent_cfg.clone();
+    let registry = state.registry.clone();
+    let cost = state.cost.clone();
+    let safety = state.safety.clone();
+    let soul = state.soul.clone();
+    let store = state.store.clone();
+    let session_id = id.clone();
 
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(64);
+
+    tokio::spawn(async move {
+        // Build history including the new user message.
+        let mut full_history = history;
+        full_history.push(user_msg);
+
+        let (stream_tx, mut stream_rx) = tokio::sync::mpsc::channel::<StreamEvent>(64);
+
+        let mut agent = Agent::new(
+            provider,
+            agent_cfg,
+            registry.executors().clone(),
+            registry.defs().to_vec(),
+        )
+        .with_cost_tracker(cost);
+
+        if let Some(safety) = safety {
+            agent = agent.with_safety(safety);
+        }
+
+        // Forward stream events to SSE in a background task.
+        let tx_clone = tx.clone();
+        let forward_handle = tokio::spawn(async move {
+            while let Some(ev) = stream_rx.recv().await {
+                let data = match &ev {
+                    StreamEvent::Text { delta, done } => {
+                        serde_json::json!({"type": "text", "delta": delta, "done": done})
+                    }
+                    StreamEvent::ToolStart { tool_call } => {
+                        serde_json::json!({"type": "tool_start", "tool": tool_call.name})
+                    }
+                    StreamEvent::ToolDone { tool_call, output } => {
+                        serde_json::json!({"type": "tool_done", "tool": tool_call.name, "output": &output[..output.len().min(500)]})
+                    }
+                    StreamEvent::Error { message } => {
+                        serde_json::json!({"type": "error", "message": message})
+                    }
+                };
+                let event = Event::default().data(serde_json::to_string(&data).unwrap());
+                if tx_clone.send(Ok(event)).await.is_err() {
+                    break;
+                }
+            }
+        });
+
+        // Set up streaming via channel-based handler.
+        let agent = agent.with_stream_handler(move |ev| {
+            let _ = stream_tx.try_send(ev);
+        });
+
+        let parts = ContextParts {
+            soul_prompt: soul,
+            history: full_history,
+            ..Default::default()
+        };
+
+        let cancel = CancellationToken::new();
+        let result = agent.run(cancel, parts).await;
+
+        // Wait for forwarding to finish.
+        forward_handle.abort();
+
+        // Send final text if the agent produced a response.
+        if !result.response.is_empty() {
+            let final_event = Event::default().data(
+                serde_json::to_string(&serde_json::json!({
+                    "type": "text",
+                    "delta": result.response,
+                    "done": true,
+                })).unwrap(),
+            );
+            let _ = tx.send(Ok(final_event)).await;
+        }
+
+        // Persist assistant response.
+        let assistant_msg = Message {
+            role: Role::Assistant,
+            content: result.response,
+            timestamp: Utc::now(),
+            ..Default::default()
+        };
+        let _ = store.append_messages(&session_id, &[assistant_msg]).await;
+
+        // Send [DONE] sentinel.
+        let _ = tx.send(Ok(Event::default().data("[DONE]"))).await;
+    });
+
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
     Sse::new(stream).into_response()
 }
 
 async fn handle_get_config(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({
-        "model": state.config.model,
-        "tasks": state.config.tasks.len(),
+        "model": state.model,
+        "tasks": state.tasks.len(),
     }))
 }
 
 async fn handle_list_tasks(State(state): State<Arc<AppState>>) -> Json<Vec<TaskInfo>> {
-    Json(state.config.tasks.clone())
+    Json(state.tasks.clone())
 }
 
 async fn handle_list_channels() -> Response {
-    let store = crate::channels::ChannelStore::new();
+    let store = crate::bots::channels::ChannelStore::new();
 
     let channels = match store.list() {
         Ok(c) => c,
@@ -227,13 +335,13 @@ async fn handle_list_channels() -> Response {
 
     Json(serde_json::json!({
         "channels": safe,
-        "providers": crate::channels::supported_providers(),
+        "providers": crate::bots::channels::supported_providers(),
     }))
     .into_response()
 }
 
 async fn handle_delete_channel(Path(id): Path<String>) -> Response {
-    let store = crate::channels::ChannelStore::new();
+    let store = crate::bots::channels::ChannelStore::new();
 
     if let Err(e) = store.remove(&id) {
         return error_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
@@ -251,7 +359,17 @@ pub async fn run(
     extra: Option<Router>,
 ) -> anyhow::Result<()> {
     let addr = config.addr.clone();
-    let state = Arc::new(AppState { store, config });
+    let state = Arc::new(AppState {
+        store,
+        model: config.model,
+        soul: config.soul,
+        tasks: config.tasks,
+        provider: config.provider,
+        agent_cfg: config.agent_cfg,
+        registry: config.registry,
+        cost: config.cost,
+        safety: config.safety,
+    });
 
     let mut app = Router::new()
         .route("/", get(handle_ui))

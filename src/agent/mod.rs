@@ -4,7 +4,7 @@
 
 pub mod context;
 pub mod discovery;
-pub mod orchestrator;
+pub mod orchestration;
 
 use crate::config::AgentConfig;
 use crate::llm::retry::{self, RetryConfig};
