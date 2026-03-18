@@ -20,7 +20,7 @@
   <a href="#features">Features</a> &middot;
   <a href="#architecture">Architecture</a> &middot;
   <a href="#configuration">Configuration</a> &middot;
-  <a href="#editions">Editions</a>
+  <a href="#comparison">Comparison</a>
 </p>
 
 ---
@@ -238,28 +238,7 @@ scheduler:
 
 Environment variables override config: `MARSCLAW_PROVIDER=ollama`, `MARSCLAW_MODEL=llama3.1`, etc.
 
-## Editions
-
-MarsClaw comes in three editions:
-
-| | **PicoClaw** | **OpenClaw** | **MarsClaw** |
-|---|:---:|:---:|:---:|
-| Binary size | **~2 MB** | **~4 MB** | **~5 MB** |
-| Agent loop | Single-turn | Full | Full |
-| LLM providers | 1 (OpenAI-compat) | All 4 | All 4 |
-| Tools | 3 (read, write, shell) | All 7 | All 7 |
-| Channels | None | Telegram, Discord | All 5 |
-| Web UI | None | Basic | Full dashboard |
-| Multi-agent | None | None | Pipeline, Parallel, Debate, Supervisor |
-| MCP | None | Yes | Yes |
-| Memory | None | None | Episodic, Semantic, Procedural |
-| Skills | None | Built-in | Built-in + installable |
-| Scheduler | None | None | Cron-based |
-| Use case | Embedded, IoT, edge | Open-source projects | Production, enterprise |
-| License | MIT | Apache-2.0 | Apache-2.0 |
-| Repo | [picoclaw](https://github.com/Marsstein/picoclaw) | [openclaw](https://github.com/Marsstein/openclaw) | **This repo** |
-
-## Comparison with Other Frameworks
+## Comparison
 
 | Framework | Language | Binary/Install | Cold Start | Memory | Agents |
 |-----------|----------|----------------|------------|--------|--------|
